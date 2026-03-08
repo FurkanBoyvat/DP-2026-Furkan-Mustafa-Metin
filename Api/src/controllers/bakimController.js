@@ -4,12 +4,10 @@ const pool = require('../config/database');
 const getAllBakimTalepleri = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT bt.*, a.plaka, a.marka, a.model, 
-              k.ad as talep_eden_ad, k.soyad as talep_eden_soyad
+      `SELECT bt.*, a.plaka, a.marka, a.model
        FROM bakim_talepleri bt
        LEFT JOIN araclar a ON bt.arac_id = a.arac_id
-       LEFT JOIN kullanicilar k ON bt.talep_eden_id = k.kullanici_id
-       ORDER BY bt.olusturma_tarihi DESC`
+       ORDER BY bt.talek_tarihi DESC`
     );
     
     res.status(200).json({
@@ -30,16 +28,14 @@ const getAllBakimTalepleri = async (req, res) => {
 // Tek bakım talebi getir
 const getBakimTalebiById = async (req, res) => {
   try {
-    const { talep_id } = req.params;
+    const { talek_id } = req.params;
     
     const result = await pool.query(
-      `SELECT bt.*, a.plaka, a.marka, a.model,
-              k.ad as talep_eden_ad, k.soyad as talep_eden_soyad
+      `SELECT bt.*, a.plaka, a.marka, a.model
        FROM bakim_talepleri bt
        LEFT JOIN araclar a ON bt.arac_id = a.arac_id
-       LEFT JOIN kullanicilar k ON bt.talep_eden_id = k.kullanici_id
-       WHERE bt.talep_id = $1`,
-      [talep_id]
+       WHERE bt.talek_id = $1`,
+      [talek_id]
     );
     
     if (result.rows.length === 0) {
@@ -67,13 +63,13 @@ const getBakimTalebiById = async (req, res) => {
 // Bakım talebi oluştur
 const createBakimTalebi = async (req, res) => {
   try {
-    const { arac_id, bakim_tipi, aciklama, oncelik, talep_eden_id } = req.body;
+    const { arac_id, bakim_tipi, aciklama, oncelik } = req.body;
     
     const result = await pool.query(
-      `INSERT INTO bakim_talepleri (arac_id, bakim_tipi, aciklama, oncelik, talep_eden_id, durum)
-       VALUES ($1, $2, $3, $4, $5, 'beklemede')
+      `INSERT INTO bakim_talepleri (arac_id, bakim_tipi, aciklama, oncelik, durum)
+       VALUES ($1, $2, $3, $4, 'beklemede')
        RETURNING *`,
-      [arac_id, bakim_tipi, aciklama, oncelik, talep_eden_id]
+      [arac_id, bakim_tipi, aciklama, oncelik]
     );
     
     res.status(201).json({
@@ -94,16 +90,16 @@ const createBakimTalebi = async (req, res) => {
 // Bakım talebi güncelle
 const updateBakimTalebi = async (req, res) => {
   try {
-    const { talep_id } = req.params;
-    const { bakim_tipi, aciklama, oncelik, tamir_aciklamasi, tamir_edildi_tarihi } = req.body;
+    const { talek_id } = req.params;
+    const { bakim_tipi, aciklama, oncelik, tamir_aciklamasi, tamir_tarihi } = req.body;
     
     const result = await pool.query(
       `UPDATE bakim_talepleri 
        SET bakim_tipi = $1, aciklama = $2, oncelik = $3, 
-           tamir_aciklamasi = $4, tamir_edildi_tarihi = $5, guncelleme_tarihi = CURRENT_TIMESTAMP
-       WHERE talep_id = $6
+           tamir_aciklamasi = $4, tamir_tarihi = $5, guncelleme_tarihi = CURRENT_TIMESTAMP
+       WHERE talek_id = $6
        RETURNING *`,
-      [bakim_tipi, aciklama, oncelik, tamir_aciklamasi, tamir_edildi_tarihi, talep_id]
+      [bakim_tipi, aciklama, oncelik, tamir_aciklamasi, tamir_tarihi, talek_id]
     );
     
     if (result.rows.length === 0) {
@@ -131,11 +127,11 @@ const updateBakimTalebi = async (req, res) => {
 // Bakım talebi sil
 const deleteBakimTalebi = async (req, res) => {
   try {
-    const { talep_id } = req.params;
+    const { talek_id } = req.params;
     
     const result = await pool.query(
-      'DELETE FROM bakim_talepleri WHERE talep_id = $1 RETURNING *',
-      [talep_id]
+      'DELETE FROM bakim_talepleri WHERE talek_id = $1 RETURNING *',
+      [talek_id]
     );
     
     if (result.rows.length === 0) {
@@ -165,11 +161,10 @@ const getBakimTalepleriByArac = async (req, res) => {
     const { arac_id } = req.params;
     
     const result = await pool.query(
-      `SELECT bt.*, k.ad as talep_eden_ad, k.soyad as talep_eden_soyad
+      `SELECT bt.*
        FROM bakim_talepleri bt
-       LEFT JOIN kullanicilar k ON bt.talep_eden_id = k.kullanici_id
        WHERE bt.arac_id = $1
-       ORDER BY bt.olusturma_tarihi DESC`,
+       ORDER BY bt.talek_tarihi DESC`,
       [arac_id]
     );
     
@@ -194,13 +189,11 @@ const getBakimTalepleriByDurum = async (req, res) => {
     const { durum } = req.params;
     
     const result = await pool.query(
-      `SELECT bt.*, a.plaka, a.marka, a.model,
-              k.ad as talep_eden_ad, k.soyad as talep_eden_soyad
+      `SELECT bt.*, a.plaka, a.marka, a.model
        FROM bakim_talepleri bt
        LEFT JOIN araclar a ON bt.arac_id = a.arac_id
-       LEFT JOIN kullanicilar k ON bt.talep_eden_id = k.kullanici_id
        WHERE bt.durum = $1
-       ORDER BY bt.olusturma_tarihi DESC`,
+       ORDER BY bt.talek_tarihi DESC`,
       [durum]
     );
     
@@ -222,12 +215,12 @@ const getBakimTalepleriByDurum = async (req, res) => {
 // Bakım talebi durumunu güncelle
 const updateBakimDurumu = async (req, res) => {
   try {
-    const { talep_id } = req.params;
+    const { talek_id } = req.params;
     const { durum } = req.body;
     
     const result = await pool.query(
-      'UPDATE bakim_talepleri SET durum = $1, guncelleme_tarihi = CURRENT_TIMESTAMP WHERE talep_id = $2 RETURNING *',
-      [durum, talep_id]
+      'UPDATE bakim_talepleri SET durum = $1, guncelleme_tarihi = CURRENT_TIMESTAMP WHERE talek_id = $2 RETURNING *',
+      [durum, talek_id]
     );
     
     if (result.rows.length === 0) {
@@ -255,15 +248,15 @@ const updateBakimDurumu = async (req, res) => {
 // Bakım maliyeti ekle
 const addBakimMaliyeti = async (req, res) => {
   try {
-    const { talep_id } = req.params;
-    const { parca_bedeli, iscilik_bedeli, toplam_bedel, notlar } = req.body;
+    const { talek_id } = req.params;
+    const { parca_maliyeti, iscilik_maliyeti, toplam_maliyet, tamir_aciklamasi, tamir_tarihi } = req.body;
     
     const result = await pool.query(
       `UPDATE bakim_talepleri 
-       SET parca_bedeli = $1, iscilik_bedeli = $2, toplam_bedel = $3, notlar = $4, guncelleme_tarihi = CURRENT_TIMESTAMP
-       WHERE talep_id = $5
+       SET parca_maliyeti = $1, iscilik_maliyeti = $2, toplam_maliyet = $3, tamir_aciklamasi = $4, tamir_tarihi = $5, durum = 'tamamlandi', guncelleme_tarihi = CURRENT_TIMESTAMP
+       WHERE talek_id = $6
        RETURNING *`,
-      [parca_bedeli, iscilik_bedeli, toplam_bedel, notlar, talep_id]
+      [parca_maliyeti, iscilik_maliyeti, toplam_maliyet, tamir_aciklamasi, tamir_tarihi, talek_id]
     );
     
     if (result.rows.length === 0) {

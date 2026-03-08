@@ -4,14 +4,14 @@ const pool = require('../config/database');
 const getAllAracSoforleri = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT aso.*, a.plaka, a.marka, a.model,
+      `SELECT aso.*, a.plaka, a.marka, a.model, a.sirket_id,
               k.ad as sofor_ad, k.soyad as sofor_soyad, k.email as sofor_email,
               s.sirket_adi
        FROM arac_soforleri aso
        LEFT JOIN araclar a ON aso.arac_id = a.arac_id
-       LEFT JOIN kullanicilar k ON aso.sofor_id = k.kullanici_id
-       LEFT JOIN sirketler s ON aso.sirket_id = s.sirket_id
-       ORDER BY aso.baslama_tarihi DESC`
+       LEFT JOIN kullanicilar k ON aso.kullanici_id = k.kullanici_id
+       LEFT JOIN sirketler s ON a.sirket_id = s.sirket_id
+       ORDER BY aso.atama_tarihi DESC`
     );
     
     res.status(200).json({
@@ -40,9 +40,9 @@ const getAracSoforuById = async (req, res) => {
               s.sirket_adi
        FROM arac_soforleri aso
        LEFT JOIN araclar a ON aso.arac_id = a.arac_id
-       LEFT JOIN kullanicilar k ON aso.sofor_id = k.kullanici_id
+       LEFT JOIN kullanicilar k ON aso.kullanici_id = k.kullanici_id
        LEFT JOIN sirketler s ON aso.sirket_id = s.sirket_id
-       WHERE aso.atama_id = $1`,
+       WHERE aso.sofor_id = $1`,
       [atama_id]
     );
     
@@ -73,22 +73,20 @@ const createAracSoforu = async (req, res) => {
   try {
     const { 
       arac_id, 
-      sofor_id, 
-      baslama_tarihi, 
-      bitis_tarihi, 
-      atama_tipi,
-      aciklama,
-      sirket_id 
+      kullanici_id,
+      sofor_adi,
+      sofor_soyadi,
+      ehliyet_numarasi,
+      ehliyet_son_validasyon_tarihi,
+      telefon
     } = req.body;
-    
-    const atama_yapan_id = req.user.kullanici_id;
     
     const result = await pool.query(
       `INSERT INTO arac_soforleri 
-       (arac_id, sofor_id, baslama_tarihi, bitis_tarihi, atama_tipi, aciklama, sirket_id, atama_yapan_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (arac_id, kullanici_id, sofor_adi, sofor_soyadi, ehliyet_numarasi, ehliyet_son_validasyon_tarihi, telefon)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [arac_id, sofor_id, baslama_tarihi, bitis_tarihi, atama_tipi, aciklama, sirket_id, atama_yapan_id]
+      [arac_id, kullanici_id, sofor_adi, sofor_soyadi, ehliyet_numarasi, ehliyet_son_validasyon_tarihi, telefon]
     );
     
     res.status(201).json({
@@ -110,14 +108,14 @@ const createAracSoforu = async (req, res) => {
 const updateAracSoforu = async (req, res) => {
   try {
     const { atama_id } = req.params;
-    const { baslama_tarihi, bitis_tarihi, atama_tipi, aciklama, atama_durumu } = req.body;
+    const { sofor_adi, sofor_soyadi, ehliyet_numarasi, ehliyet_son_validasyon_tarihi, telefon, durum } = req.body;
     
     const result = await pool.query(
       `UPDATE arac_soforleri 
-       SET baslama_tarihi = $1, bitis_tarihi = $2, atama_tipi = $3, aciklama = $4, atama_durumu = $5
-       WHERE atama_id = $6
+       SET sofor_adi = $1, sofor_soyadi = $2, ehliyet_numarasi = $3, ehliyet_son_validasyon_tarihi = $4, telefon = $5, durum = $6
+       WHERE sofor_id = $7
        RETURNING *`,
-      [baslama_tarihi, bitis_tarihi, atama_tipi, aciklama, atama_durumu, atama_id]
+      [sofor_adi, sofor_soyadi, ehliyet_numarasi, ehliyet_son_validasyon_tarihi, telefon, durum, atama_id]
     );
     
     if (result.rows.length === 0) {
@@ -148,7 +146,7 @@ const deleteAracSoforu = async (req, res) => {
     const { atama_id } = req.params;
     
     const result = await pool.query(
-      'DELETE FROM arac_soforleri WHERE atama_id = $1 RETURNING *',
+      'DELETE FROM arac_soforleri WHERE sofor_id = $1 RETURNING *',
       [atama_id]
     );
     
@@ -181,9 +179,9 @@ const getAracSoforleriByArac = async (req, res) => {
     const result = await pool.query(
       `SELECT aso.*, k.ad as sofor_ad, k.soyad as sofor_soyad, k.email as sofor_email
        FROM arac_soforleri aso
-       LEFT JOIN kullanicilar k ON aso.sofor_id = k.kullanici_id
+       LEFT JOIN kullanicilar k ON aso.kullanici_id = k.kullanici_id
        WHERE aso.arac_id = $1
-       ORDER BY aso.baslama_tarihi DESC`,
+       ORDER BY aso.atama_tarihi DESC`,
       [arac_id]
     );
     
@@ -211,8 +209,8 @@ const getAracSoforleriBySofor = async (req, res) => {
       `SELECT aso.*, a.plaka, a.marka, a.model
        FROM arac_soforleri aso
        LEFT JOIN araclar a ON aso.arac_id = a.arac_id
-       WHERE aso.sofor_id = $1
-       ORDER BY aso.baslama_tarihi DESC`,
+       WHERE aso.kullanici_id = $1
+       ORDER BY aso.atama_tarihi DESC`,
       [sofor_id]
     );
     
@@ -240,10 +238,10 @@ const getAktifAracSoforleri = async (req, res) => {
               s.sirket_adi
        FROM arac_soforleri aso
        LEFT JOIN araclar a ON aso.arac_id = a.arac_id
-       LEFT JOIN kullanicilar k ON aso.sofor_id = k.kullanici_id
-       LEFT JOIN sirketler s ON aso.sirket_id = s.sirket_id
-       WHERE aso.atama_durumu = 'aktif'
-       ORDER BY aso.baslama_tarihi DESC`
+       LEFT JOIN kullanicilar k ON aso.kullanici_id = k.kullanici_id
+       LEFT JOIN sirketler s ON a.sirket_id = s.sirket_id
+       WHERE aso.durum = true
+       ORDER BY aso.atama_tarihi DESC`
     );
     
     res.status(200).json({

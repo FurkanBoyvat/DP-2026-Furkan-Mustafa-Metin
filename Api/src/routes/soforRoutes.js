@@ -1,33 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const soforController = require('../controllers/soforController');
-const { verifyToken } = require('../middleware/authMiddleware');
 
 // Tüm araç-şoför atamalarını listele
-router.get('/', verifyToken, soforController.getAllSoforAtamalari);
+router.get('/', soforController.getAllSoforAtamalari);
+
+// Aktif şoför atamalarını getir (/:atama_id'dan ÖNCE tanımlanmalı!)
+router.get('/aktif/all', soforController.getAktifSoforAtamalari);
 
 // Tek şoför ataması getir
-router.get('/:atama_id', verifyToken, soforController.getSoforAtamasiById);
+router.get('/:atama_id', soforController.getSoforAtamasiById);
 
 // Araç-şoför ataması oluştur
-router.post('/', verifyToken, soforController.createSoforAtamasi);
+router.post('/', soforController.createSoforAtamasi);
 
 // Şoför atamasını güncelle
-router.put('/:atama_id', verifyToken, soforController.updateSoforAtamasi);
+router.put('/:atama_id', soforController.updateSoforAtamasi);
 
 // Şoför atamasını sil
-router.delete('/:atama_id', verifyToken, soforController.deleteSoforAtamasi);
+router.delete('/:atama_id', soforController.deleteSoforAtamasi);
 
 // Araca göre şoför atamalarını getir
-router.get('/arac/:arac_id', verifyToken, soforController.getSoforAtamalariByArac);
+router.get('/arac/:arac_id', soforController.getSoforAtamalariByArac);
 
 // Şoföre göre atamaları getir
-router.get('/sofor/:kullanici_id', verifyToken, soforController.getSoforAtamalariBySofor);
-
-// Aktif şoför atamalarını getir
-router.get('/aktif/all', verifyToken, soforController.getAktifSoforAtamalari);
+router.get('/sofor/:kullanici_id', soforController.getSoforAtamalariBySofor);
 
 // Şoför atamasını pasif yap
-router.put('/:atama_id/pasif', verifyToken, soforController.deactivateSoforAtamasi);
+router.put('/:atama_id/pasif', soforController.deactivateSoforAtamasi);
 
 module.exports = router;

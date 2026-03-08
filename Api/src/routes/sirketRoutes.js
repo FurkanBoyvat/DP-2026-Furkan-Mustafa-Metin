@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const sirketController = require('../controllers/sirketController');
-const { verifyToken, verifySirketYoneticisi } = require('../middleware/authMiddleware');
 
 // Tüm şirketleri getir
 router.get('/', sirketController.getAllSirketler);
@@ -10,15 +9,15 @@ router.get('/', sirketController.getAllSirketler);
 router.get('/:sirket_id', sirketController.getSirketById);
 
 // Şirket detaylarını güncelle
-router.put('/:sirket_id/detaylar', verifyToken, sirketController.updateSirketDetay);
+router.put('/:sirket_id/detaylar', sirketController.updateSirketDetay);
 
-// Yeni şirket oluştur (Korumalı)
-router.post('/', verifyToken, sirketController.createSirket);
+// Yeni şirket oluştur
+router.post('/', sirketController.createSirket);
 
-// Şirket güncelle (Korumalı)
-router.put('/:sirket_id', verifyToken, sirketController.updateSirket);
+// Şirket güncelle
+router.put('/:sirket_id', sirketController.updateSirket);
 
-// Şirket sil (Korumalı)
-router.delete('/:sirket_id', verifyToken, sirketController.deleteSirket);
+// Şirket sil
+router.delete('/:sirket_id', sirketController.deleteSirket);
 
 module.exports = router;

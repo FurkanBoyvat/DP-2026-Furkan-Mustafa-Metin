@@ -4,13 +4,11 @@ const pool = require('../config/database');
 const getAllBolgeIhlalleri = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT bik.*, a.plaka, ka.alan_adi, 
-              k.ad as kayit_eden_ad, k.soyad as kayit_eden_soyad
+      `SELECT bik.*, a.plaka, ka.alan_adi
        FROM bolge_ihlal_kayitlari bik
        LEFT JOIN araclar a ON bik.arac_id = a.arac_id
        LEFT JOIN kisitli_alanlar ka ON bik.alan_id = ka.alan_id
-       LEFT JOIN kullanicilar k ON bik.kayit_eden_id = k.kullanici_id
-       ORDER BY bik.ihlal_zamani DESC`
+       ORDER BY bik.giris_tarihi DESC`
     );
     
     res.status(200).json({
@@ -34,12 +32,10 @@ const getBolgeIhlaliById = async (req, res) => {
     const { ihlal_id } = req.params;
     
     const result = await pool.query(
-      `SELECT bik.*, a.plaka, ka.alan_adi, 
-              k.ad as kayit_eden_ad, k.soyad as kayit_eden_soyad
+      `SELECT bik.*, a.plaka, ka.alan_adi
        FROM bolge_ihlal_kayitlari bik
        LEFT JOIN araclar a ON bik.arac_id = a.arac_id
        LEFT JOIN kisitli_alanlar ka ON bik.alan_id = ka.alan_id
-       LEFT JOIN kullanicilar k ON bik.kayit_eden_id = k.kullanici_id
        WHERE bik.ihlal_id = $1`,
       [ihlal_id]
     );
@@ -72,21 +68,20 @@ const createBolgeIhlali = async (req, res) => {
     const { 
       arac_id, 
       alan_id, 
-      ihlal_zamani, 
-      enlem, 
-      boylam, 
-      ihlal_tipi,
-      aciklama 
+      giris_tarihi,
+      cikis_tarihi,
+      kalis_suresi_dakika,
+      max_hiz,
+      surucu_adi,
+      notlar
     } = req.body;
-    
-    const kayit_eden_id = req.user.kullanici_id;
     
     const result = await pool.query(
       `INSERT INTO bolge_ihlal_kayitlari 
-       (arac_id, alan_id, ihlal_zamani, enlem, boylam, ihlal_tipi, aciklama, kayit_eden_id)
+       (arac_id, alan_id, giris_tarihi, cikis_tarihi, kalis_suresi_dakika, max_hiz, surucu_adi, notlar)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [arac_id, alan_id, ihlal_zamani, enlem, boylam, ihlal_tipi, aciklama, kayit_eden_id]
+      [arac_id, alan_id, giris_tarihi, cikis_tarihi, kalis_suresi_dakika, max_hiz, surucu_adi, notlar]
     );
     
     res.status(201).json({
@@ -108,14 +103,14 @@ const createBolgeIhlali = async (req, res) => {
 const updateBolgeIhlali = async (req, res) => {
   try {
     const { ihlal_id } = req.params;
-    const { ihlal_tipi, aciklama, cozum_durumu } = req.body;
+    const { ihlal_tipi, notlar, onay_durum } = req.body;
     
     const result = await pool.query(
       `UPDATE bolge_ihlal_kayitlari 
-       SET ihlal_tipi = $1, aciklama = $2, cozum_durumu = $3
+       SET ihlal_tipi = $1, notlar = $2, onay_durum = $3
        WHERE ihlal_id = $4
        RETURNING *`,
-      [ihlal_tipi, aciklama, cozum_durumu, ihlal_id]
+      [ihlal_tipi, notlar, onay_durum, ihlal_id]
     );
     
     if (result.rows.length === 0) {
@@ -177,12 +172,11 @@ const getBolgeIhlalleriByArac = async (req, res) => {
     const { arac_id } = req.params;
     
     const result = await pool.query(
-      `SELECT bik.*, ka.alan_adi, k.ad as kayit_eden_ad, k.soyad as kayit_eden_soyad
+      `SELECT bik.*, ka.alan_adi
        FROM bolge_ihlal_kayitlari bik
        LEFT JOIN kisitli_alanlar ka ON bik.alan_id = ka.alan_id
-       LEFT JOIN kullanicilar k ON bik.kayit_eden_id = k.kullanici_id
        WHERE bik.arac_id = $1
-       ORDER BY bik.ihlal_zamani DESC`,
+       ORDER BY bik.giris_tarihi DESC`,
       [arac_id]
     );
     
@@ -207,14 +201,12 @@ const getBolgeIhlalleriByTarihAraligi = async (req, res) => {
     const { baslangic_tarihi, bitis_tarihi } = req.query;
     
     const result = await pool.query(
-      `SELECT bik.*, a.plaka, ka.alan_adi, 
-              k.ad as kayit_eden_ad, k.soyad as kayit_eden_soyad
+      `SELECT bik.*, a.plaka, ka.alan_adi
        FROM bolge_ihlal_kayitlari bik
        LEFT JOIN araclar a ON bik.arac_id = a.arac_id
        LEFT JOIN kisitli_alanlar ka ON bik.alan_id = ka.alan_id
-       LEFT JOIN kullanicilar k ON bik.kayit_eden_id = k.kullanici_id
-       WHERE bik.ihlal_zamani BETWEEN $1 AND $2
-       ORDER BY bik.ihlal_zamani DESC`,
+       WHERE bik.giris_tarihi BETWEEN $1 AND $2
+       ORDER BY bik.giris_tarihi DESC`,
       [baslangic_tarihi, bitis_tarihi]
     );
     
@@ -237,14 +229,12 @@ const getBolgeIhlalleriByTarihAraligi = async (req, res) => {
 const getCozulmemisIhlaller = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT bik.*, a.plaka, ka.alan_adi, 
-              k.ad as kayit_eden_ad, k.soyad as kayit_eden_soyad
+      `SELECT bik.*, a.plaka, ka.alan_adi
        FROM bolge_ihlal_kayitlari bik
        LEFT JOIN araclar a ON bik.arac_id = a.arac_id
        LEFT JOIN kisitli_alanlar ka ON bik.alan_id = ka.alan_id
-       LEFT JOIN kullanicilar k ON bik.kayit_eden_id = k.kullanici_id
-       WHERE bik.cozum_durumu = 'cozulmedi'
-       ORDER BY bik.ihlal_zamani DESC`
+       WHERE bik.onay_durum = false
+       ORDER BY bik.giris_tarihi DESC`
     );
     
     res.status(200).json({

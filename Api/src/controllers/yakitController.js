@@ -4,11 +4,9 @@ const pool = require('../config/database');
 const getAllYakitKayitlari = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT ytk.*, a.plaka, a.marka, a.model,
-              k.ad as kayit_eden_ad, k.soyad as kayit_eden_soyad
+      `SELECT ytk.*, a.plaka, a.marka, a.model
        FROM yakit_tuketim_kayitlari ytk
        LEFT JOIN araclar a ON ytk.arac_id = a.arac_id
-       LEFT JOIN kullanicilar k ON ytk.kayit_eden_id = k.kullanici_id
        ORDER BY ytk.kayit_tarihi DESC`
     );
     
@@ -33,12 +31,10 @@ const getYakitKaydiById = async (req, res) => {
     const { kayit_id } = req.params;
     
     const result = await pool.query(
-      `SELECT ytk.*, a.plaka, a.marka, a.model,
-              k.ad as kayit_eden_ad, k.soyad as kayit_eden_soyad
+      `SELECT ytk.*, a.plaka, a.marka, a.model
        FROM yakit_tuketim_kayitlari ytk
        LEFT JOIN araclar a ON ytk.arac_id = a.arac_id
-       LEFT JOIN kullanicilar k ON ytk.kayit_eden_id = k.kullanici_id
-       WHERE ytk.kayit_id = $1`,
+       WHERE ytk.yakit_id = $1`,
       [kayit_id]
     );
     
@@ -67,14 +63,14 @@ const getYakitKaydiById = async (req, res) => {
 // Yakıt kaydı oluştur
 const createYakitKaydi = async (req, res) => {
   try {
-    const { arac_id, litre, birim_fiyat, toplam_tutar, km, kayit_eden_id, istasyon, yakit_tipi } = req.body;
+    const { arac_id, yakit_miktari, birim_fiyat, yakit_tutari, istasyon_adi, ikmal_tarihi } = req.body;
     
     const result = await pool.query(
       `INSERT INTO yakit_tuketim_kayitlari 
-       (arac_id, litre, birim_fiyat, toplam_tutar, km, kayit_eden_id, istasyon, yakit_tipi)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (arac_id, yakit_miktari, birim_fiyat, yakit_tutari, istasyon_adi, ikmal_tarihi)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [arac_id, litre, birim_fiyat, toplam_tutar, km, kayit_eden_id, istasyon, yakit_tipi]
+      [arac_id, yakit_miktari, birim_fiyat, yakit_tutari, istasyon_adi, ikmal_tarihi]
     );
     
     res.status(201).json({
@@ -96,15 +92,14 @@ const createYakitKaydi = async (req, res) => {
 const updateYakitKaydi = async (req, res) => {
   try {
     const { kayit_id } = req.params;
-    const { litre, birim_fiyat, toplam_tutar, km, istasyon, yakit_tipi } = req.body;
+    const { yakit_miktari, birim_fiyat, yakit_tutari, istasyon_adi, ikmal_tarihi } = req.body;
     
     const result = await pool.query(
       `UPDATE yakit_tuketim_kayitlari 
-       SET litre = $1, birim_fiyat = $2, toplam_tutar = $3, km = $4, 
-           istasyon = $5, yakit_tipi = $6, guncelleme_tarihi = CURRENT_TIMESTAMP
-       WHERE kayit_id = $7
+       SET yakit_miktari = $1, birim_fiyat = $2, yakit_tutari = $3, istasyon_adi = $4, ikmal_tarihi = $5
+       WHERE yakit_id = $6
        RETURNING *`,
-      [litre, birim_fiyat, toplam_tutar, km, istasyon, yakit_tipi, kayit_id]
+      [yakit_miktari, birim_fiyat, yakit_tutari, istasyon_adi, ikmal_tarihi, kayit_id]
     );
     
     if (result.rows.length === 0) {
@@ -135,7 +130,7 @@ const deleteYakitKaydi = async (req, res) => {
     const { kayit_id } = req.params;
     
     const result = await pool.query(
-      'DELETE FROM yakit_tuketim_kayitlari WHERE kayit_id = $1 RETURNING *',
+      'DELETE FROM yakit_tuketim_kayitlari WHERE yakit_id = $1 RETURNING *',
       [kayit_id]
     );
     
@@ -166,9 +161,8 @@ const getYakitKayitlariByArac = async (req, res) => {
     const { arac_id } = req.params;
     
     const result = await pool.query(
-      `SELECT ytk.*, k.ad as kayit_eden_ad, k.soyad as kayit_eden_soyad
+      `SELECT ytk.*
        FROM yakit_tuketim_kayitlari ytk
-       LEFT JOIN kullanicilar k ON ytk.kayit_eden_id = k.kullanici_id
        WHERE ytk.arac_id = $1
        ORDER BY ytk.kayit_tarihi DESC`,
       [arac_id]
@@ -195,11 +189,9 @@ const getYakitKayitlariByTarihAraligi = async (req, res) => {
     const { baslangic_tarihi, bitis_tarihi } = req.query;
     
     const result = await pool.query(
-      `SELECT ytk.*, a.plaka, a.marka, a.model,
-              k.ad as kayit_eden_ad, k.soyad as kayit_eden_soyad
+      `SELECT ytk.*, a.plaka, a.marka, a.model
        FROM yakit_tuketim_kayitlari ytk
        LEFT JOIN araclar a ON ytk.arac_id = a.arac_id
-       LEFT JOIN kullanicilar k ON ytk.kayit_eden_id = k.kullanici_id
        WHERE ytk.kayit_tarihi BETWEEN $1 AND $2
        ORDER BY ytk.kayit_tarihi DESC`,
       [baslangic_tarihi, bitis_tarihi]
@@ -228,10 +220,10 @@ const getOrtalamaYakitTuketimi = async (req, res) => {
     const result = await pool.query(
       `SELECT 
          COUNT(*) as yaklama_sayisi,
-         SUM(litre) as toplam_litre,
-         AVG(litre) as ortalama_litre,
-         SUM(toplam_tutar) as toplam_tutar,
-         AVG(toplam_tutar) as ortalama_tutar
+         SUM(yakit_miktari) as toplam_yakit,
+         AVG(yakit_miktari) as ortalama_yakit,
+         SUM(yakit_tutari) as toplam_tutar,
+         AVG(yakit_tutari) as ortalama_tutar
        FROM yakit_tuketim_kayitlari 
        WHERE arac_id = $1`,
       [arac_id]
@@ -262,9 +254,9 @@ const getAylikYakitRaporu = async (req, res) => {
       `SELECT 
          EXTRACT(MONTH FROM kayit_tarihi) as ay,
          COUNT(*) as yaklama_sayisi,
-         SUM(litre) as toplam_litre,
-         SUM(toplam_tutar) as toplam_tutar,
-         AVG(litre) as ortalama_litre
+         SUM(yakit_miktari) as toplam_yakit,
+         SUM(yakit_tutari) as toplam_tutar,
+         AVG(yakit_miktari) as ortalama_yakit
        FROM yakit_tuketim_kayitlari 
        WHERE EXTRACT(YEAR FROM kayit_tarihi) = $1
        GROUP BY EXTRACT(MONTH FROM kayit_tarihi)

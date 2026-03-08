@@ -1,33 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const bakimController = require('../controllers/bakimController');
-const { verifyToken } = require('../middleware/authMiddleware');
 
 // Tüm bakım taleplerini listele
-router.get('/', verifyToken, bakimController.getAllBakimTalepleri);
-
-// Tek bakım talebi getir
-router.get('/:talep_id', verifyToken, bakimController.getBakimTalebiById);
-
-// Bakım talebi oluştur
-router.post('/', verifyToken, bakimController.createBakimTalebi);
-
-// Bakım talebi güncelle
-router.put('/:talep_id', verifyToken, bakimController.updateBakimTalebi);
-
-// Bakım talebi sil
-router.delete('/:talep_id', verifyToken, bakimController.deleteBakimTalebi);
+router.get('/', bakimController.getAllBakimTalepleri);
 
 // Araca göre bakım taleplerini getir
-router.get('/arac/:arac_id', verifyToken, bakimController.getBakimTalepleriByArac);
+router.get('/arac/:arac_id', bakimController.getBakimTalepleriByArac);
 
 // Duruma göre bakım taleplerini getir
-router.get('/durum/:durum', verifyToken, bakimController.getBakimTalepleriByDurum);
+router.get('/durum/:durum', bakimController.getBakimTalepleriByDurum);
+
+// Tek bakım talebi getir
+router.get('/:talek_id', bakimController.getBakimTalebiById);
+
+// Bakım talebi oluştur
+router.post('/', bakimController.createBakimTalebi);
+
+// Bakım talebi güncelle
+router.put('/:talek_id', bakimController.updateBakimTalebi);
+
+// Bakım talebi sil
+router.delete('/:talek_id', bakimController.deleteBakimTalebi);
 
 // Bakım talebi durumunu güncelle
-router.put('/:talep_id/durum', verifyToken, bakimController.updateBakimDurumu);
+router.put('/:talek_id/durum', bakimController.updateBakimDurumu);
 
 // Bakım maliyeti ekle
-router.post('/:talep_id/maliyet', verifyToken, bakimController.addBakimMaliyeti);
+router.post('/:talek_id/maliyet', bakimController.addBakimMaliyeti);
 
 module.exports = router;

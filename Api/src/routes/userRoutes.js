@@ -1,30 +1,29 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
-const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 
-// Tüm kullanıcıları listele (Admin)
+// Tüm kullanıcıları listele
 router.get('/', userController.getAllUsers);
 
-// Tek kullanıcı getir
-router.get('/:kullanici_id', verifyToken, userController.getUserById);
+// Şoförleri getir (/:kullanici_id'dan ÖNCE tanımlanmalı!)
+router.get('/soforler/all', userController.getAllDrivers);
 
-// Kullanıcı oluştur (Admin)
-router.post('/', verifyToken, verifyAdmin, userController.createUser);
+// Kullanıcıları şirkete göre getir (/:kullanici_id'dan ÖNCE tanımlanmalı!)
+router.get('/sirket/:sirket_id', userController.getUsersByCompany);
+
+// Tek kullanıcı getir
+router.get('/:kullanici_id', userController.getUserById);
+
+// Kullanıcı oluştur
+router.post('/', userController.createUser);
 
 // Kullanıcı güncelle
-router.put('/:kullanici_id', verifyToken, userController.updateUser);
+router.put('/:kullanici_id', userController.updateUser);
 
-// Kullanıcı sil (Admin)
-router.delete('/:kullanici_id', verifyToken, verifyAdmin, userController.deleteUser);
+// Kullanıcı sil
+router.delete('/:kullanici_id', userController.deleteUser);
 
-// Kullanıcı rolünü güncelle (Admin)
-router.put('/:kullanici_id/rol', verifyToken, verifyAdmin, userController.updateUserRole);
-
-// Kullanıcıları şirkete göre getir
-router.get('/sirket/:sirket_id', verifyToken, userController.getUsersByCompany);
-
-// Şoförleri getir
-router.get('/soforler/all', verifyToken, userController.getAllDrivers);
+// Kullanıcı rolünü güncelle
+router.put('/:kullanici_id/rol', userController.updateUserRole);
 
 module.exports = router;

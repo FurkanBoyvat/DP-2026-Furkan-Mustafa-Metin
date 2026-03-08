@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:furkan3803@localhost:5432/arac_takip_sistemi',
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:3803@localhost:5432/arac_takip_sistemi',
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,

@@ -1,30 +1,29 @@
 const express = require('express');
 const router = express.Router();
 const bolgeIhlalController = require('../controllers/bolgeIhlalController');
-const { verifyToken } = require('../middleware/authMiddleware');
 
 // Tüm bölge ihlal kayıtlarını listele
-router.get('/', verifyToken, bolgeIhlalController.getAllBolgeIhlalleri);
+router.get('/', bolgeIhlalController.getAllBolgeIhlalleri);
 
-// Tek bölge ihlal kaydı getir
-router.get('/:ihlal_id', verifyToken, bolgeIhlalController.getBolgeIhlaliById);
-
-// Bölge ihlal kaydı oluştur
-router.post('/', verifyToken, bolgeIhlalController.createBolgeIhlali);
-
-// Bölge ihlal kaydı güncelle
-router.put('/:ihlal_id', verifyToken, bolgeIhlalController.updateBolgeIhlali);
-
-// Bölge ihlal kaydı sil
-router.delete('/:ihlal_id', verifyToken, bolgeIhlalController.deleteBolgeIhlali);
+// Çözülmeyen ihlal kayıtlarını getir (/:ihlal_id'dan ÖNCE tanımlanmalı!)
+router.get('/cozulmemis/all', bolgeIhlalController.getCozulmemisIhlaller);
 
 // Araca göre bölge ihlal kayıtlarını getir
-router.get('/arac/:arac_id', verifyToken, bolgeIhlalController.getBolgeIhlalleriByArac);
+router.get('/arac/:arac_id', bolgeIhlalController.getBolgeIhlalleriByArac);
 
 // Tarih aralığına göre bölge ihlal kayıtlarını getir
-router.get('/tarih/aralik', verifyToken, bolgeIhlalController.getBolgeIhlalleriByTarihAraligi);
+router.get('/tarih/aralik', bolgeIhlalController.getBolgeIhlalleriByTarihAraligi);
 
-// Çözülmeyen ihlal kayıtlarını getir
-router.get('/cozulmemis/all', verifyToken, bolgeIhlalController.getCozulmemisIhlaller);
+// Tek bölge ihlal kaydı getir
+router.get('/:ihlal_id', bolgeIhlalController.getBolgeIhlaliById);
+
+// Bölge ihlal kaydı oluştur
+router.post('/', bolgeIhlalController.createBolgeIhlali);
+
+// Bölge ihlal kaydı güncelle
+router.put('/:ihlal_id', bolgeIhlalController.updateBolgeIhlali);
+
+// Bölge ihlal kaydı sil
+router.delete('/:ihlal_id', bolgeIhlalController.deleteBolgeIhlali);
 
 module.exports = router;

@@ -7,9 +7,9 @@ const getAllRaporlar = async (req, res) => {
       `SELECT r.*, k.ad as olusturan_ad, k.soyad as olusturan_soyad,
               s.sirket_adi
        FROM raporlar r
-       LEFT JOIN kullanicilar k ON r.olusturan_id = k.kullanici_id
+       LEFT JOIN kullanicilar k ON r.kullanici_id = k.kullanici_id
        LEFT JOIN sirketler s ON r.sirket_id = s.sirket_id
-       ORDER BY r.olusturma_tarihi DESC`
+       ORDER BY r.rapor_tarihi DESC`
     );
     
     res.status(200).json({
@@ -69,22 +69,22 @@ const createRapor = async (req, res) => {
   try {
     const { 
       rapor_tipi, 
+      rapor_adi,
+      aciklama,
       baslangic_tarihi, 
-      bitis_tarihi, 
-      icerik, 
-      sirket_id,
-      filo_id,
-      arac_id 
+      bitis_tarihi,
+      bulundu_url,
+      sirket_id
     } = req.body;
     
-    const olusturan_id = req.user.kullanici_id;
+    const kullanici_id = req.user.kullanici_id;
     
     const result = await pool.query(
       `INSERT INTO raporlar 
-       (rapor_tipi, baslangic_tarihi, bitis_tarihi, icerik, sirket_id, filo_id, arac_id, olusturan_id)
+       (rapor_tipi, rapor_adi, aciklama, baslangic_tarihi, bitis_tarihi, bulundu_url, sirket_id, kullanici_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [rapor_tipi, baslangic_tarihi, bitis_tarihi, icerik, sirket_id, filo_id, arac_id, olusturan_id]
+      [rapor_tipi, rapor_adi, aciklama, baslangic_tarihi, bitis_tarihi, bulundu_url, sirket_id, kullanici_id]
     );
     
     res.status(201).json({
@@ -106,14 +106,14 @@ const createRapor = async (req, res) => {
 const updateRapor = async (req, res) => {
   try {
     const { rapor_id } = req.params;
-    const { rapor_tipi, baslangic_tarihi, bitis_tarihi, icerik } = req.body;
+    const { rapor_tipi, rapor_adi, aciklama, baslangic_tarihi, bitis_tarihi, bulundu_url } = req.body;
     
     const result = await pool.query(
       `UPDATE raporlar 
-       SET rapor_tipi = $1, baslangic_tarihi = $2, bitis_tarihi = $3, icerik = $4
-       WHERE rapor_id = $5
+       SET rapor_tipi = $1, rapor_adi = $2, aciklama = $3, baslangic_tarihi = $4, bitis_tarihi = $5, bulundu_url = $6
+       WHERE rapor_id = $7
        RETURNING *`,
-      [rapor_tipi, baslangic_tarihi, bitis_tarihi, icerik, rapor_id]
+      [rapor_tipi, rapor_adi, aciklama, baslangic_tarihi, bitis_tarihi, bulundu_url, rapor_id]
     );
     
     if (result.rows.length === 0) {
@@ -177,9 +177,9 @@ const getRaporlarBySirket = async (req, res) => {
     const result = await pool.query(
       `SELECT r.*, k.ad as olusturan_ad, k.soyad as olusturan_soyad
        FROM raporlar r
-       LEFT JOIN kullanicilar k ON r.olusturan_id = k.kullanici_id
+       LEFT JOIN kullanicilar k ON r.kullanici_id = k.kullanici_id
        WHERE r.sirket_id = $1
-       ORDER BY r.olusturma_tarihi DESC`,
+       ORDER BY r.rapor_tarihi DESC`,
       [sirket_id]
     );
     
@@ -207,10 +207,10 @@ const getRaporlarByTarihAraligi = async (req, res) => {
       `SELECT r.*, k.ad as olusturan_ad, k.soyad as olusturan_soyad,
               s.sirket_adi
        FROM raporlar r
-       LEFT JOIN kullanicilar k ON r.olusturan_id = k.kullanici_id
+       LEFT JOIN kullanicilar k ON r.kullanici_id = k.kullanici_id
        LEFT JOIN sirketler s ON r.sirket_id = s.sirket_id
-       WHERE r.olusturma_tarihi BETWEEN $1 AND $2
-       ORDER BY r.olusturma_tarihi DESC`,
+       WHERE r.rapor_tarihi BETWEEN $1 AND $2
+       ORDER BY r.rapor_tarihi DESC`,
       [baslangic_tarihi, bitis_tarihi]
     );
     

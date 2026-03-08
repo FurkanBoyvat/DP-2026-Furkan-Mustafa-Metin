@@ -8,9 +8,9 @@ const getAllSirketYoneticileri = async (req, res) => {
               k.email as yonetici_email, k.telefon as yonetici_telefon,
               s.sirket_adi
        FROM sirket_yoneticileri sy
-       LEFT JOIN kullanicilar k ON sy.yonetici_id = k.kullanici_id
+       LEFT JOIN kullanicilar k ON sy.kullanici_id = k.kullanici_id
        LEFT JOIN sirketler s ON sy.sirket_id = s.sirket_id
-       ORDER BY sy.atama_tarihi DESC`
+       ORDER BY sy.olusturulma_tarihi DESC`
     );
     
     res.status(200).json({
@@ -31,17 +31,17 @@ const getAllSirketYoneticileri = async (req, res) => {
 // Tek şirket yöneticisi getir
 const getSirketYoneticisiById = async (req, res) => {
   try {
-    const { yonetici_atama_id } = req.params;
+    const { yonetici_id } = req.params;
     
     const result = await pool.query(
       `SELECT sy.*, k.ad as yonetici_ad, k.soyad as yonetici_soyad, 
               k.email as yonetici_email, k.telefon as yonetici_telefon,
               s.sirket_adi
        FROM sirket_yoneticileri sy
-       LEFT JOIN kullanicilar k ON sy.yonetici_id = k.kullanici_id
+       LEFT JOIN kullanicilar k ON sy.kullanici_id = k.kullanici_id
        LEFT JOIN sirketler s ON sy.sirket_id = s.sirket_id
-       WHERE sy.yonetici_atama_id = $1`,
-      [yonetici_atama_id]
+       WHERE sy.yonetici_id = $1`,
+      [yonetici_id]
     );
     
     if (result.rows.length === 0) {
@@ -70,21 +70,17 @@ const getSirketYoneticisiById = async (req, res) => {
 const createSirketYoneticisi = async (req, res) => {
   try {
     const { 
-      yonetici_id, 
+      kullanici_id, 
       sirket_id, 
-      yonetici_seviyesi, 
-      yetki_kapsami,
-      atama_tarihi 
+      yetki_seviyesi
     } = req.body;
-    
-    const atama_yapan_id = req.user.kullanici_id;
     
     const result = await pool.query(
       `INSERT INTO sirket_yoneticileri 
-       (yonetici_id, sirket_id, yonetici_seviyesi, yetki_kapsami, atama_tarihi, atama_yapan_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
+       (kullanici_id, sirket_id, yetki_seviyesi)
+       VALUES ($1, $2, $3)
        RETURNING *`,
-      [yonetici_id, sirket_id, yonetici_seviyesi, yetki_kapsami, atama_tarihi, atama_yapan_id]
+      [kullanici_id, sirket_id, yetki_seviyesi]
     );
     
     res.status(201).json({
@@ -105,15 +101,15 @@ const createSirketYoneticisi = async (req, res) => {
 // Şirket yöneticisi güncelle
 const updateSirketYoneticisi = async (req, res) => {
   try {
-    const { yonetici_atama_id } = req.params;
-    const { yonetici_seviyesi, yetki_kapsami, atama_durumu } = req.body;
+    const { yonetici_id } = req.params;
+    const { yetki_seviyesi } = req.body;
     
     const result = await pool.query(
       `UPDATE sirket_yoneticileri 
-       SET yonetici_seviyesi = $1, yetki_kapsami = $2, atama_durumu = $3
-       WHERE yonetici_atama_id = $4
+       SET yetki_seviyesi = $1
+       WHERE yonetici_id = $2
        RETURNING *`,
-      [yonetici_seviyesi, yetki_kapsami, atama_durumu, yonetici_atama_id]
+      [yetki_seviyesi, yonetici_id]
     );
     
     if (result.rows.length === 0) {
@@ -141,11 +137,11 @@ const updateSirketYoneticisi = async (req, res) => {
 // Şirket yöneticisi atamasını sil
 const deleteSirketYoneticisi = async (req, res) => {
   try {
-    const { yonetici_atama_id } = req.params;
+    const { yonetici_id } = req.params;
     
     const result = await pool.query(
-      'DELETE FROM sirket_yoneticileri WHERE yonetici_atama_id = $1 RETURNING *',
-      [yonetici_atama_id]
+      'DELETE FROM sirket_yoneticileri WHERE yonetici_id = $1 RETURNING *',
+      [yonetici_id]
     );
     
     if (result.rows.length === 0) {
@@ -178,9 +174,9 @@ const getSirketYoneticileriBySirket = async (req, res) => {
       `SELECT sy.*, k.ad as yonetici_ad, k.soyad as yonetici_soyad, 
               k.email as yonetici_email, k.telefon as yonetici_telefon
        FROM sirket_yoneticileri sy
-       LEFT JOIN kullanicilar k ON sy.yonetici_id = k.kullanici_id
+       LEFT JOIN kullanicilar k ON sy.kullanici_id = k.kullanici_id
        WHERE sy.sirket_id = $1
-       ORDER BY sy.atama_tarihi DESC`,
+       ORDER BY sy.olusturulma_tarihi DESC`,
       [sirket_id]
     );
     
@@ -202,15 +198,15 @@ const getSirketYoneticileriBySirket = async (req, res) => {
 // Kullanıcıya göre yönetici atamalarını getir
 const getSirketYoneticileriByKullanici = async (req, res) => {
   try {
-    const { yonetici_id } = req.params;
+    const { kullanici_id } = req.params;
     
     const result = await pool.query(
       `SELECT sy.*, s.sirket_adi
        FROM sirket_yoneticileri sy
        LEFT JOIN sirketler s ON sy.sirket_id = s.sirket_id
-       WHERE sy.yonetici_id = $1
-       ORDER BY sy.atama_tarihi DESC`,
-      [yonetici_id]
+       WHERE sy.kullanici_id = $1
+       ORDER BY sy.olusturulma_tarihi DESC`,
+      [kullanici_id]
     );
     
     res.status(200).json({
@@ -236,10 +232,9 @@ const getAktifSirketYoneticileri = async (req, res) => {
               k.email as yonetici_email, k.telefon as yonetici_telefon,
               s.sirket_adi
        FROM sirket_yoneticileri sy
-       LEFT JOIN kullanicilar k ON sy.yonetici_id = k.kullanici_id
+       LEFT JOIN kullanicilar k ON sy.kullanici_id = k.kullanici_id
        LEFT JOIN sirketler s ON sy.sirket_id = s.sirket_id
-       WHERE sy.atama_durumu = 'aktif'
-       ORDER BY s.sirket_adi, sy.yonetici_seviyesi`
+       ORDER BY s.sirket_adi, sy.yetki_seviyesi`
     );
     
     res.status(200).json({

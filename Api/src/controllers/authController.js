@@ -163,9 +163,38 @@ exports.register = async (req, res) => {
 // Profil Bilgileri
 exports.profil = async (req, res) => {
   try {
+    // Token'dan kullanici_id oku (middleware olmasa da token gönderiliyorsa decode et)
+    let kullanici_id = null;
+
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(
+          token,
+          process.env.JWT_SECRET || 'arac_takip_sistemi_gizli_anahtar_2026_jwt_secret_key_cok_guvenli'
+        );
+        kullanici_id = decoded.kullanici_id;
+      } catch (e) {
+        return res.status(401).json({
+          success: false,
+          message: 'Geçersiz veya süresi dolmuş token',
+          code: 'INVALID_TOKEN'
+        });
+      }
+    }
+
+    if (!kullanici_id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token gerekli',
+        code: 'NO_TOKEN'
+      });
+    }
+
     const result = await pool.query(
       'SELECT kullanici_id, email, ad, soyad, telefon, rol, durum, olusturulma_tarihi, son_giris_tarih FROM kullanicilar WHERE kullanici_id = $1',
-      [req.kullanici.kullanici_id]
+      [kullanici_id]
     );
 
     if (result.rows.length === 0) {

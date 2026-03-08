@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const aracController = require('../controllers/aracController');
-const { verifyToken } = require('../middleware/authMiddleware');
 
 // Tüm araçlar
 router.get('/', aracController.getAllAraclar);
@@ -16,12 +15,12 @@ router.get('/plaka/:plaka', aracController.getAracByPlaka);
 router.get('/:arac_id', aracController.getAracById);
 
 // Yeni araç oluştur
-router.post('/', verifyToken, aracController.createArac);
+router.post('/', aracController.createArac);
 
 // Araç güncelle
-router.put('/:arac_id', verifyToken, aracController.updateArac);
+router.put('/:arac_id', aracController.updateArac);
 
 // Araç sil
-router.delete('/:arac_id', verifyToken, aracController.deleteArac);
+router.delete('/:arac_id', aracController.deleteArac);
 
 module.exports = router;

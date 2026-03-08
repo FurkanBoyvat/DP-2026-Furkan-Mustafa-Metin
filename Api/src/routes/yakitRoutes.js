@@ -1,33 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const yakitController = require('../controllers/yakitController');
-const { verifyToken } = require('../middleware/authMiddleware');
 
 // Tüm yakıt tüketim kayıtlarını listele
-router.get('/', verifyToken, yakitController.getAllYakitKayitlari);
+router.get('/', yakitController.getAllYakitKayitlari);
 
-// Tek yakıt kaydı getir
-router.get('/:kayit_id', verifyToken, yakitController.getYakitKaydiById);
-
-// Yakıt kaydı oluştur
-router.post('/', verifyToken, yakitController.createYakitKaydi);
-
-// Yakıt kaydı güncelle
-router.put('/:kayit_id', verifyToken, yakitController.updateYakitKaydi);
-
-// Yakıt kaydı sil
-router.delete('/:kayit_id', verifyToken, yakitController.deleteYakitKaydi);
+// Aylık yakıt raporu (/:kayit_id'dan ÖNCE tanımlanmalı!)
+router.get('/rapor/aylik', yakitController.getAylikYakitRaporu);
 
 // Araca göre yakıt kayıtlarını getir
-router.get('/arac/:arac_id', verifyToken, yakitController.getYakitKayitlariByArac);
-
-// Tarih aralığına göre yakıt kayıtlarını getir
-router.get('/tarih/aralik', verifyToken, yakitController.getYakitKayitlariByTarihAraligi);
+router.get('/arac/:arac_id', yakitController.getYakitKayitlariByArac);
 
 // Aracın ortalama yakıt tüketimini hesapla
-router.get('/arac/:arac_id/ortalama', verifyToken, yakitController.getOrtalamaYakitTuketimi);
+router.get('/arac/:arac_id/ortalama', yakitController.getOrtalamaYakitTuketimi);
 
-// Aylık yakıt raporu
-router.get('/rapor/aylik', verifyToken, yakitController.getAylikYakitRaporu);
+// Tarih aralığına göre yakıt kayıtlarını getir
+router.get('/tarih/aralik', yakitController.getYakitKayitlariByTarihAraligi);
+
+// Tek yakıt kaydı getir
+router.get('/:kayit_id', yakitController.getYakitKaydiById);
+
+// Yakıt kaydı oluştur
+router.post('/', yakitController.createYakitKaydi);
+
+// Yakıt kaydı güncelle
+router.put('/:kayit_id', yakitController.updateYakitKaydi);
+
+// Yakıt kaydı sil
+router.delete('/:kayit_id', yakitController.deleteYakitKaydi);
 
 module.exports = router;
