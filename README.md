@@ -271,11 +271,3 @@ Hata bildirmek veya öneride bulunmak için:
 ## 📄 Lisans
 
 Bu proje MIT Lisansı altında lisanslanmıştır. Detaylar için `LICENSE` dosyasını inceleyin.
-
-## 👨‍💻 Yazar
-
-**Ramazan** - *Proje geliştirici*
-
----
-
-⭐ Bu projeyi beğendiyseniz yıldız vermeyi unutmayın!
