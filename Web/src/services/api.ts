@@ -111,6 +111,14 @@ export const yakitAPI = {
   create: (data: any) => fetchWithAuth('/yakit', { method: 'POST', body: JSON.stringify(data) }),
   update: (kayit_id: number, data: any) => fetchWithAuth(`/yakit/${kayit_id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (kayit_id: number) => fetchWithAuth(`/yakit/${kayit_id}`, { method: 'DELETE' }),
+  
+  // Şoför Bazlı Yeni Metotlar
+  getSoforKayitlari: () => fetchWithAuth('/yakit/sofor/kayitlar'),
+  getLeaderboard: () => fetchWithAuth('/yakit/sofor/leaderboard'),
+  getLeaderboardByAracTipi: () => fetchWithAuth('/yakit/sofor/leaderboard/arac-tipi'),
+  createSoforKayit: (data: any) => fetchWithAuth('/yakit/sofor/kayitlar', { method: 'POST', body: JSON.stringify(data) }),
+  updateSoforKayit: (kayit_id: number, data: any) => fetchWithAuth(`/yakit/sofor/kayitlar/${kayit_id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSoforKayit: (kayit_id: number) => fetchWithAuth(`/yakit/sofor/kayitlar/${kayit_id}`, { method: 'DELETE' }),
 };
 
 // Bakım API

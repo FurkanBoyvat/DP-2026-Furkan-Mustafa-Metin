@@ -71,15 +71,17 @@ const createKisitliAlan = async (req, res) => {
       yaricap_metre,
       max_hiz_kmh,
       alan_tipi,
-      sirket_id 
+      sirket_id,
+      geometri_tipi = 'daire',
+      koordinatlar = null
     } = req.body;
     
     const result = await pool.query(
       `INSERT INTO kisitli_alanlar 
-       (alan_adi, aciklama, merkez_enlem, merkez_boylam, yaricap_metre, max_hiz_kmh, alan_tipi, sirket_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (alan_adi, aciklama, merkez_enlem, merkez_boylam, yaricap_metre, max_hiz_kmh, alan_tipi, sirket_id, geometri_tipi, koordinatlar)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [alan_adi, aciklama, merkez_enlem, merkez_boylam, yaricap_metre, max_hiz_kmh, alan_tipi, sirket_id]
+      [alan_adi, aciklama, merkez_enlem || null, merkez_boylam || null, yaricap_metre || null, max_hiz_kmh, alan_tipi, sirket_id, geometri_tipi, koordinatlar ? JSON.stringify(koordinatlar) : null]
     );
     
     res.status(201).json({
@@ -101,15 +103,25 @@ const createKisitliAlan = async (req, res) => {
 const updateKisitliAlan = async (req, res) => {
   try {
     const { alan_id } = req.params;
-    const { alan_adi, aciklama, merkez_enlem, merkez_boylam, yaricap_metre, max_hiz_kmh, alan_tipi, durum } = req.body;
+    const { 
+      alan_adi, aciklama, merkez_enlem, merkez_boylam, yaricap_metre, 
+      max_hiz_kmh, alan_tipi, durum, geometri_tipi, koordinatlar 
+    } = req.body;
     
     const result = await pool.query(
       `UPDATE kisitli_alanlar 
        SET alan_adi = $1, aciklama = $2, merkez_enlem = $3, merkez_boylam = $4, 
-           yaricap_metre = $5, max_hiz_kmh = $6, alan_tipi = $7, durum = $8, guncelleme_tarihi = CURRENT_TIMESTAMP
-       WHERE alan_id = $9
+           yaricap_metre = $5, max_hiz_kmh = $6, alan_tipi = $7, durum = $8,
+           geometri_tipi = $9, koordinatlar = $10,
+           guncelleme_tarihi = CURRENT_TIMESTAMP
+       WHERE alan_id = $11
        RETURNING *`,
-      [alan_adi, aciklama, merkez_enlem, merkez_boylam, yaricap_metre, max_hiz_kmh, alan_tipi, durum, alan_id]
+      [
+        alan_adi, aciklama, merkez_enlem || null, merkez_boylam || null, 
+        yaricap_metre || null, max_hiz_kmh, alan_tipi, durum, 
+        geometri_tipi || 'daire', koordinatlar ? JSON.stringify(koordinatlar) : null,
+        alan_id
+      ]
     );
     
     if (result.rows.length === 0) {

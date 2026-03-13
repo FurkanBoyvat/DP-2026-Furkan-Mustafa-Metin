@@ -279,6 +279,238 @@ const getAylikYakitRaporu = async (req, res) => {
   }
 };
 
+// Şoför aylık yakıt kaydı oluştur
+const createSoforYakitKaydi = async (req, res) => {
+  try {
+    const { kullanici_id, ay, yil, aylik_km, aylik_yakit_tutar, notlar } = req.body;
+    
+    const result = await pool.query(
+      `INSERT INTO sofor_yakit_kayitlari 
+       (kullanici_id, ay, yil, aylik_km, aylik_yakit_tutar, notlar)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [kullanici_id, ay, yil, aylik_km, aylik_yakit_tutar, notlar]
+    );
+    
+    res.status(201).json({
+      success: true,
+      data: result.rows[0],
+      message: 'Şoför yakıt kaydı başarıyla oluşturuldu'
+    });
+  } catch (error) {
+    console.error('Şoför yakıt kaydı oluşturma hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Şoför yakıt kaydı oluşturulamadı',
+      error: error.message
+    });
+  }
+};
+
+// Tüm şoför yakıt kayıtlarını listele
+const getAllSoforYakitKayitlari = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT syk.*, k.ad, k.soyad, s.sirket_adi, f.filo_adi
+       FROM sofor_yakit_kayitlari syk
+       JOIN kullanicilar k ON syk.kullanici_id = k.kullanici_id
+       LEFT JOIN sirket_yoneticileri sy ON k.kullanici_id = sy.kullanici_id
+       LEFT JOIN sirketler s ON sy.sirket_id = s.sirket_id
+       LEFT JOIN filolar f ON k.filo_id = f.filo_id
+       ORDER BY syk.yil DESC, syk.ay DESC, syk.olusturulma_tarihi DESC`
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: result.rows,
+      message: 'Şoför yakıt kayıtları başarıyla getirildi'
+    });
+  } catch (error) {
+    console.error('Şoför yakıt kayıtlarını getirme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Şoför yakıt kayıtları getirilemedi',
+      error: error.message
+    });
+  }
+};
+
+// Şoför yakıt kaydı güncelle
+const updateSoforYakitKaydi = async (req, res) => {
+  try {
+    const { kayit_id } = req.params;
+    const { ay, yil, aylik_km, aylik_yakit_tutar, notlar } = req.body;
+    
+    const result = await pool.query(
+      `UPDATE sofor_yakit_kayitlari 
+       SET ay = $1, yil = $2, aylik_km = $3, aylik_yakit_tutar = $4, notlar = $5
+       WHERE kayit_id = $6
+       RETURNING *`,
+      [ay, yil, aylik_km, aylik_yakit_tutar, notlar, kayit_id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kayıt bulunamadı'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: result.rows[0],
+      message: 'Şoför yakıt kaydı başarıyla güncellendi'
+    });
+  } catch (error) {
+    console.error('Şoför yakıt kaydı güncelleme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Şoför yakıt kaydı güncellenemedi',
+      error: error.message
+    });
+  }
+};
+
+// Şoför yakıt kaydı sil
+const deleteSoforYakitKaydi = async (req, res) => {
+  try {
+    const { kayit_id } = req.params;
+    
+    const result = await pool.query(
+      'DELETE FROM sofor_yakit_kayitlari WHERE kayit_id = $1 RETURNING *',
+      [kayit_id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kayıt bulunamadı'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Şoför yakıt kaydı başarıyla silindi'
+    });
+  } catch (error) {
+    console.error('Şoför yakıt kaydı silme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Şoför yakıt kaydı silinemedi',
+      error: error.message
+    });
+  }
+};
+
+// Şoför başarı sıralaması (Leaderboard)
+const getSoforLeaderboard = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+         syk.kullanici_id, 
+         k.ad, 
+         k.soyad, 
+         s.sirket_adi, 
+         f.filo_adi,
+         SUM(syk.aylik_km) as toplam_km,
+         SUM(syk.aylik_yakit_tutar) as toplam_tutar,
+         CASE 
+           WHEN SUM(syk.aylik_km) > 0 THEN (SUM(syk.aylik_yakit_tutar) / SUM(syk.aylik_km))
+           ELSE 0 
+         END as birim_maliyet
+       FROM sofor_yakit_kayitlari syk
+       JOIN kullanicilar k ON syk.kullanici_id = k.kullanici_id
+       LEFT JOIN sirket_yoneticileri sy ON k.kullanici_id = sy.kullanici_id
+       LEFT JOIN sirketler s ON sy.sirket_id = s.sirket_id
+       LEFT JOIN filolar f ON k.filo_id = f.filo_id
+       GROUP BY syk.kullanici_id, k.ad, k.soyad, s.sirket_adi, f.filo_adi
+       HAVING SUM(syk.aylik_km) > 0
+       ORDER BY birim_maliyet ASC`
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: result.rows,
+      message: 'Şoför başarı sıralaması başarıyla getirildi'
+    });
+  } catch (error) {
+    console.error('Leaderboard getirme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sıralama getirilemedi',
+      error: error.message
+    });
+  }
+};
+
+// Araç tipine göre şoför başarı sıralaması – sadece aracı atanmış şoförler (kamyon-kamyon, otobüs-otobüs vb.)
+const getSoforLeaderboardByAracTipi = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `WITH driver_arac AS (
+         SELECT DISTINCT ON (kullanici_id) kullanici_id, arac_id
+         FROM arac_soforleri
+         WHERE durum = true
+         ORDER BY kullanici_id, atama_tarihi DESC NULLS LAST
+       ),
+       ranked AS (
+         SELECT 
+           a.arac_tipi,
+           syk.kullanici_id,
+           k.ad,
+           k.soyad,
+           s.sirket_adi,
+           f.filo_adi,
+           SUM(syk.aylik_km) AS toplam_km,
+           SUM(syk.aylik_yakit_tutar) AS toplam_tutar,
+           CASE 
+             WHEN SUM(syk.aylik_km) > 0 THEN (SUM(syk.aylik_yakit_tutar) / SUM(syk.aylik_km))
+             ELSE 0 
+           END AS birim_maliyet
+         FROM sofor_yakit_kayitlari syk
+         JOIN kullanicilar k ON syk.kullanici_id = k.kullanici_id
+         INNER JOIN driver_arac da ON k.kullanici_id = da.kullanici_id
+         INNER JOIN araclar a ON da.arac_id = a.arac_id
+         LEFT JOIN sirket_yoneticileri sy ON k.kullanici_id = sy.kullanici_id
+         LEFT JOIN sirketler s ON sy.sirket_id = s.sirket_id
+         LEFT JOIN filolar f ON k.filo_id = f.filo_id
+         GROUP BY syk.kullanici_id, k.ad, k.soyad, s.sirket_adi, f.filo_adi, a.arac_tipi
+         HAVING SUM(syk.aylik_km) > 0
+       )
+       SELECT * FROM ranked ORDER BY arac_tipi, birim_maliyet ASC`
+    );
+
+    const byTip = {};
+    for (const row of result.rows) {
+      const tip = row.arac_tipi;
+      if (!byTip[tip]) byTip[tip] = [];
+      byTip[tip].push({
+        kullanici_id: row.kullanici_id,
+        ad: row.ad,
+        soyad: row.soyad,
+        sirket_adi: row.sirket_adi,
+        filo_adi: row.filo_adi,
+        toplam_km: row.toplam_km,
+        toplam_tutar: row.toplam_tutar,
+        birim_maliyet: row.birim_maliyet,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: byTip,
+      message: 'Araç tipine göre başarı sıralaması getirildi'
+    });
+  } catch (error) {
+    console.error('Araç tipine göre leaderboard hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Araç tipine göre sıralama getirilemedi',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllYakitKayitlari,
   getYakitKaydiById,
@@ -288,5 +520,11 @@ module.exports = {
   getYakitKayitlariByArac,
   getYakitKayitlariByTarihAraligi,
   getOrtalamaYakitTuketimi,
-  getAylikYakitRaporu
+  getAylikYakitRaporu,
+  createSoforYakitKaydi,
+  getAllSoforYakitKayitlari,
+  updateSoforYakitKaydi,
+  deleteSoforYakitKaydi,
+  getSoforLeaderboard,
+  getSoforLeaderboardByAracTipi
 };

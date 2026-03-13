@@ -9,7 +9,7 @@ const getAllUsers = async (req, res) => {
        FROM kullanicilar k 
        ORDER BY k.olusturulma_tarihi DESC`
     );
-    
+
     res.status(200).json({
       success: true,
       data: result.rows,
@@ -29,24 +29,24 @@ const getAllUsers = async (req, res) => {
 const getUserById = async (req, res) => {
   try {
     const { kullanici_id } = req.params;
-    
+
     const result = await pool.query(
       `SELECT k.* 
        FROM kullanicilar k 
        WHERE k.kullanici_id = $1`,
       [kullanici_id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Kullanıcı bulunamadı'
       });
     }
-    
+
     // Şifre hariç diğer bilgileri gönder
     const { sifre, ...userWithoutPassword } = result.rows[0];
-    
+
     res.status(200).json({
       success: true,
       data: userWithoutPassword,
@@ -62,34 +62,51 @@ const getUserById = async (req, res) => {
   }
 };
 
-// Kullanıcı oluştur
 const createUser = async (req, res) => {
   try {
-    const { email, sifre, ad, soyad, telefon, rol } = req.body;
-    
+    const { email, sifre, ad, soyad, telefon, rol, sirket_id, filo_id } = req.body;
+
+    // Zorunlu alan kontrolü
+    if (!email || !sifre || !ad || !soyad || !telefon) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, şifre, ad, soyad ve telefon alanları zorunludur'
+      });
+    }
+
     // Email kontrolü
     const existingUser = await pool.query(
       'SELECT * FROM kullanicilar WHERE email = $1',
       [email]
     );
-    
+
     if (existingUser.rows.length > 0) {
       return res.status(400).json({
         success: false,
         message: 'Bu email adresi zaten kayıtlı'
       });
     }
-    
+
     // Şifreyi hash'le
     const hashedSifre = await bcrypt.hash(sifre, 10);
-    
+
     const result = await pool.query(
-      `INSERT INTO kullanicilar (email, sifre, ad, soyad, telefon, rol)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING kullanici_id, email, ad, soyad, telefon, rol, olusturulma_tarihi`,
-      [email, hashedSifre, ad, soyad, telefon, rol]
+      `INSERT INTO kullanicilar (email, sifre, ad, soyad, telefon, rol, filo_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING kullanici_id, email, ad, soyad, telefon, rol, filo_id, olusturulma_tarihi`,
+      [email, hashedSifre, ad, soyad, telefon, rol, filo_id || null]
     );
-    
+
+    // Şirket ataması yap
+    if (sirket_id) {
+      await pool.query(
+        `INSERT INTO sirket_yoneticileri (kullanici_id, sirket_id, yetki_seviyesi)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (sirket_id, kullanici_id) DO NOTHING`,
+        [result.rows[0].kullanici_id, sirket_id, 1]
+      );
+    }
+
     res.status(201).json({
       success: true,
       data: result.rows[0],
@@ -109,43 +126,64 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { kullanici_id } = req.params;
-    const { ad, soyad, telefon } = req.body;
-    
+    const { ad, soyad, telefon, email, rol, sifre, sirket_id, filo_id } = req.body;
+
     // Kullanıcının varlığını kontrol et
     const existingUser = await pool.query(
       'SELECT * FROM kullanicilar WHERE kullanici_id = $1',
       [kullanici_id]
     );
-    
+
     if (existingUser.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Kullanıcı bulunamadı'
       });
     }
-    
-    // Yetki kontrolü - kullanıcı sadece kendi bilgilerini güncelleyebilir
-    if (req.user.rol !== 'admin' && req.user.kullanici_id !== parseInt(kullanici_id)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Bu işlem için yetkiniz yok'
-      });
+
+    let updateQuery = `UPDATE kullanicilar SET 
+      ad = COALESCE($1, ad), 
+      soyad = COALESCE($2, soyad), 
+      telefon = COALESCE($3, telefon), 
+      email = COALESCE($4, email), 
+      rol = COALESCE($5, rol), 
+      filo_id = $6,
+      guncelleme_tarihi = CURRENT_TIMESTAMP`;
+
+    let queryParams = [ad, soyad, telefon, email, rol, filo_id || null];
+    let queryIndex = 7;
+
+    if (sifre) {
+      const hashedSifre = await bcrypt.hash(sifre, 10);
+      updateQuery += `, sifre = $${queryIndex}`;
+      queryParams.push(hashedSifre);
+      queryIndex++;
     }
-    
-    const result = await pool.query(
-      `UPDATE kullanicilar 
-       SET ad = $1, soyad = $2, telefon = $3, guncelleme_tarihi = CURRENT_TIMESTAMP
-       WHERE kullanici_id = $4
-       RETURNING kullanici_id, email, ad, soyad, telefon, rol`,
-      [ad, soyad, telefon, kullanici_id]
-    );
-    
+
+    updateQuery += ` WHERE kullanici_id = $${queryIndex} RETURNING *`;
+    queryParams.push(kullanici_id);
+
+    const result = await pool.query(updateQuery, queryParams);
+
+    // Şirket atamasını güncelle veya oluştur
+    if (sirket_id) {
+      await pool.query(
+        `INSERT INTO sirket_yoneticileri (kullanici_id, sirket_id, yetki_seviyesi)
+         VALUES ($1, $2, 1)
+         ON CONFLICT (sirket_id, kullanici_id) DO UPDATE SET sirket_id = EXCLUDED.sirket_id`,
+        [kullanici_id, sirket_id]
+      );
+    }
+
     res.status(200).json({
       success: true,
       data: result.rows[0],
       message: 'Kullanıcı başarıyla güncellendi'
     });
   } catch (error) {
+    if (error.code === '23505') {
+      return res.status(400).json({ success: false, message: 'Bu email adresi başka bir kullanıcı tarafından kullanılıyor' });
+    }
     console.error('Kullanıcı güncelleme hatası:', error);
     res.status(500).json({
       success: false,
@@ -159,27 +197,19 @@ const updateUser = async (req, res) => {
 const deleteUser = async (req, res) => {
   try {
     const { kullanici_id } = req.params;
-    
-    // Kendini silme kontrolü
-    if (req.user.kullanici_id === parseInt(kullanici_id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Kendi hesabınızı silemezsiniz'
-      });
-    }
-    
+
     const result = await pool.query(
       'DELETE FROM kullanicilar WHERE kullanici_id = $1 RETURNING *',
       [kullanici_id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Kullanıcı bulunamadı'
       });
     }
-    
+
     res.status(200).json({
       success: true,
       message: 'Kullanıcı başarıyla silindi'
@@ -199,19 +229,19 @@ const updateUserRole = async (req, res) => {
   try {
     const { kullanici_id } = req.params;
     const { rol } = req.body;
-    
+
     const result = await pool.query(
-      'UPDATE kullanicilar SET rol = $1, updated_at = CURRENT_TIMESTAMP WHERE kullanici_id = $2 RETURNING *',
+      'UPDATE kullanicilar SET rol = $1, guncelleme_tarihi = CURRENT_TIMESTAMP WHERE kullanici_id = $2 RETURNING *',
       [rol, kullanici_id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Kullanıcı bulunamadı'
       });
     }
-    
+
     res.status(200).json({
       success: true,
       data: result.rows[0],
@@ -231,7 +261,7 @@ const updateUserRole = async (req, res) => {
 const getUsersByCompany = async (req, res) => {
   try {
     const { sirket_id } = req.params;
-    
+
     const result = await pool.query(
       `SELECT k.kullanici_id, k.email, k.ad, k.soyad, k.telefon, k.rol 
        FROM kullanicilar k
@@ -240,7 +270,7 @@ const getUsersByCompany = async (req, res) => {
        ORDER BY k.ad, k.soyad`,
       [sirket_id]
     );
-    
+
     res.status(200).json({
       success: true,
       data: result.rows,
@@ -260,16 +290,22 @@ const getUsersByCompany = async (req, res) => {
 const getAllDrivers = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT k.kullanici_id, k.ad, k.soyad, k.telefon, k.email,
-              COUNT(a.arac_id) as arac_sayisi
+      `SELECT k.kullanici_id, k.ad, k.soyad, k.telefon, k.email, k.rol, k.durum,
+              COUNT(DISTINCT a.arac_id) as arac_sayisi,
+              s.sirket_adi, s.sirket_id,
+              f.filo_adi, f.filo_id
        FROM kullanicilar k
+       LEFT JOIN sirket_yoneticileri sy ON k.kullanici_id = sy.kullanici_id
+       LEFT JOIN sirketler s ON sy.sirket_id = s.sirket_id
        LEFT JOIN arac_soforleri aso ON k.kullanici_id = aso.kullanici_id
        LEFT JOIN araclar a ON aso.arac_id = a.arac_id
-       WHERE k.rol = 'sofor'
-       GROUP BY k.kullanici_id, k.ad, k.soyad, k.telefon, k.email
+       LEFT JOIN filolar f ON k.filo_id = f.filo_id
+       WHERE k.rol = 'surucü'
+       GROUP BY k.kullanici_id, k.ad, k.soyad, k.telefon, k.email, k.rol, k.durum,
+                s.sirket_adi, s.sirket_id, f.filo_adi, f.filo_id
        ORDER BY k.ad, k.soyad`
     );
-    
+
     res.status(200).json({
       success: true,
       data: result.rows,

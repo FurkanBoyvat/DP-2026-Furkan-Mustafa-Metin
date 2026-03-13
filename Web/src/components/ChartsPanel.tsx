@@ -63,8 +63,8 @@ export function ChartsPanel() {
           </div>
         </div>
         
-        <div style={{ width: '100%', height: 180 }}>
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="w-full overflow-hidden">
+          <ResponsiveContainer width="100%" height={180} minWidth={0}>
             <AreaChart data={routeHistoryData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorElevation" x1="0" y1="0" x2="0" y2="1">
@@ -95,8 +95,8 @@ export function ChartsPanel() {
         </div>
         <p className="text-xs text-gray-400 mb-4">Hız (km/s)</p>
         
-        <div style={{ width: '100%', height: 180 }}>
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="w-full overflow-hidden">
+          <ResponsiveContainer width="100%" height={180} minWidth={0}>
             <LineChart data={speedData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis 

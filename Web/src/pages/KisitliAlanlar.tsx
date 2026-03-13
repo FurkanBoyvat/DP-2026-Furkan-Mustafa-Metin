@@ -18,12 +18,14 @@ interface KisitliAlan {
   alan_adi: string;
   alan_tipi: string;
   aciklama?: string;
-  merkez_enlem: number;
-  merkez_boylam: number;
-  yaricap_metre: number;
+  merkez_enlem?: number;
+  merkez_boylam?: number;
+  yaricap_metre?: number;
   max_hiz_kmh?: number;
   durum: boolean;
   olusturulma_tarihi: string;
+  geometri_tipi?: string;
+  koordinatlar?: any;
 }
 
 interface Sirket {
@@ -430,10 +432,12 @@ export default function KisitliAlanlarPage() {
                           <TableCell>{getSirketAdi(alan.sirket_id)}</TableCell>
                           <TableCell>
                             <div className="text-xs font-mono">
-                              {alan.merkez_enlem.toFixed(6)}, {alan.merkez_boylam.toFixed(6)}
+                              {alan.geometri_tipi === 'cokgen' || alan.geometri_tipi === 'dikdortgen' 
+                                ? 'Özel Çizim' 
+                                : `${alan.merkez_enlem?.toFixed(6)}, ${alan.merkez_boylam?.toFixed(6)}`}
                             </div>
                           </TableCell>
-                          <TableCell>{alan.yaricap_metre} m</TableCell>
+                          <TableCell>{alan.geometri_tipi === 'cokgen' || alan.geometri_tipi === 'dikdortgen' ? '-' : `${alan.yaricap_metre} m`}</TableCell>
                           <TableCell>{alan.max_hiz_kmh ? `${alan.max_hiz_kmh} km/s` : '-'}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">

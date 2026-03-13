@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { soforAPI, aracAPI, aracSoforAPI } from '../services/api';
+import { soforAPI, aracAPI, aracSoforAPI, sirketAPI, filoAPI } from '../services/api';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -19,6 +19,22 @@ interface Sofor {
   telefon: string;
   rol: string;
   durum: boolean;
+  sirket_adi?: string;
+  sirket_id?: number;
+  filo_adi?: string;
+  filo_id?: number;
+  arac_sayisi?: number;
+}
+
+interface Sirket {
+  sirket_id: number;
+  sirket_adi: string;
+}
+
+interface Filo {
+  filo_id: number;
+  filo_adi: string;
+  sirket_id: number;
 }
 
 interface AracSofor {
@@ -42,7 +58,7 @@ interface Arac {
 }
 
 const rolOptions = [
-  { value: 'sürücü', label: 'Sürücü' },
+  { value: 'surucü', label: 'Sürücü' },
   { value: 'admin', label: 'Admin' },
   { value: 'sirket_yoneticisi', label: 'Şirket Yöneticisi' },
   { value: 'muhasebe', label: 'Muhasebe' },
@@ -52,6 +68,8 @@ export default function SoforlerPage() {
   const [soforler, setSoforler] = useState<Sofor[]>([]);
   const [aracSoforler, setAracSoforler] = useState<AracSofor[]>([]);
   const [araclar, setAraclar] = useState<Arac[]>([]);
+  const [sirketler, setSirketler] = useState<Sirket[]>([]);
+  const [filolar, setFilolar] = useState<Filo[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -59,14 +77,16 @@ export default function SoforlerPage() {
   const [editingSofor, setEditingSofor] = useState<Sofor | null>(null);
   const [editingAtama, setEditingAtama] = useState<AracSofor | null>(null);
   const [activeTab, setActiveTab] = useState<'soforler' | 'atamalar'>('soforler');
-  
+
   const [formData, setFormData] = useState({
     ad: '',
     soyad: '',
     email: '',
     telefon: '',
-    rol: 'sürücü',
+    rol: 'surucü',
     sifre: '',
+    sirket_id: '',
+    filo_id: '',
   });
 
   const [atamaFormData, setAtamaFormData] = useState({
@@ -86,14 +106,18 @@ export default function SoforlerPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [soforRes, aracSoforRes, aracRes] = await Promise.all([
+      const [soforRes, aracSoforRes, aracRes, sirketRes, filoRes] = await Promise.all([
         soforAPI.getAll(),
         aracSoforAPI.getAll(),
         aracAPI.getAll(),
+        sirketAPI.getAll(),
+        filoAPI.getAll(),
       ]);
       setSoforler(soforRes.data || []);
       setAracSoforler(aracSoforRes.data || []);
       setAraclar(aracRes.araclar || []);
+      setSirketler(sirketRes.sirketler || []);
+      setFilolar(filoRes.filolar || []);
     } catch (error: any) {
       toast.error('Veriler yüklenirken hata oluştu: ' + (error.message || ''));
       console.error('Load data error:', error);
@@ -102,15 +126,24 @@ export default function SoforlerPage() {
     }
   };
 
+  const filteredFilolar = formData.sirket_id
+    ? filolar.filter(f => f.sirket_id === parseInt(formData.sirket_id))
+    : filolar;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const submitData = {
+        ...formData,
+        ...(formData.sirket_id && { sirket_id: parseInt(formData.sirket_id) }),
+        ...(formData.filo_id && { filo_id: parseInt(formData.filo_id) }),
+      };
       if (editingSofor) {
-        const { sifre, ...updateData } = formData;
-        await soforAPI.update(editingSofor.kullanici_id, sifre ? formData : updateData);
+        const { sifre, sirket_id, ...updateData } = submitData;
+        await soforAPI.update(editingSofor.kullanici_id, sifre ? { ...updateData, sifre } : updateData);
         toast.success('Şoför başarıyla güncellendi');
       } else {
-        await soforAPI.create(formData);
+        await soforAPI.create(submitData);
         toast.success('Şoför başarıyla oluşturuldu');
       }
       setIsDialogOpen(false);
@@ -176,6 +209,8 @@ export default function SoforlerPage() {
       telefon: sofor.telefon,
       rol: sofor.rol,
       sifre: '',
+      sirket_id: sofor.sirket_id ? String(sofor.sirket_id) : '',
+      filo_id: sofor.filo_id ? String(sofor.filo_id) : '',
     });
     setIsDialogOpen(true);
   };
@@ -201,8 +236,10 @@ export default function SoforlerPage() {
       soyad: '',
       email: '',
       telefon: '',
-      rol: 'sürücü',
+      rol: 'surucü',
       sifre: '',
+      sirket_id: '',
+      filo_id: '',
     });
   };
 
@@ -230,15 +267,15 @@ export default function SoforlerPage() {
   };
 
   const filteredSoforler = soforler.filter(sofor =>
-    sofor.ad.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sofor.soyad.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    sofor.email.toLowerCase().includes(searchTerm.toLowerCase())
+    (sofor.ad || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (sofor.soyad || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (sofor.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredAtamalar = aracSoforler.filter(atama =>
-    atama.sofor_adi.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    atama.sofor_soyadi.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getAracPlaka(atama.arac_id).toLowerCase().includes(searchTerm.toLowerCase())
+    (atama.sofor_adi || (atama as any).sofor_adı || (atama as any).sofor_ad || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (atama.sofor_soyadi || (atama as any).sofor_soyad || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (getAracPlaka(atama.arac_id) || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -262,6 +299,7 @@ export default function SoforlerPage() {
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>{editingAtama ? 'Atama Düzenle' : 'Yeni Araç Atama'}</DialogTitle>
+                <DialogDescription>Araç-şoför ataması bilgilerini girin</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAtamaSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -289,8 +327,8 @@ export default function SoforlerPage() {
                       value={atamaFormData.kullanici_id}
                       onValueChange={(value) => {
                         const sofor = soforler.find(s => s.kullanici_id === parseInt(value));
-                        setAtamaFormData({ 
-                          ...atamaFormData, 
+                        setAtamaFormData({
+                          ...atamaFormData,
                           kullanici_id: value,
                           sofor_adi: sofor?.ad || '',
                           sofor_soyadi: sofor?.soyad || '',
@@ -352,6 +390,7 @@ export default function SoforlerPage() {
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>{editingSofor ? 'Şoför Düzenle' : 'Yeni Şoför Ekle'}</DialogTitle>
+                <DialogDescription>Şoför bilgilerini girin</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -384,12 +423,13 @@ export default function SoforlerPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="telefon">Telefon</Label>
+                    <Label htmlFor="telefon">Telefon *</Label>
                     <Input
                       id="telefon"
                       value={formData.telefon}
                       onChange={(e) => setFormData({ ...formData, telefon: e.target.value })}
                       placeholder="0555 123 4567"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
@@ -421,6 +461,43 @@ export default function SoforlerPage() {
                       onChange={(e) => setFormData({ ...formData, sifre: e.target.value })}
                       required={!editingSofor}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sirket">Şirket</Label>
+                    <Select
+                      value={formData.sirket_id}
+                      onValueChange={(value) => setFormData({ ...formData, sirket_id: value, filo_id: '' })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Şirket seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sirketler.map((sirket) => (
+                          <SelectItem key={sirket.sirket_id} value={String(sirket.sirket_id)}>
+                            {sirket.sirket_adi}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="filo">Filo</Label>
+                    <Select
+                      value={formData.filo_id}
+                      disabled={!formData.sirket_id}
+                      onValueChange={(value) => setFormData({ ...formData, filo_id: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={formData.sirket_id ? "Filo seçin" : "Önce şirket seçin"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredFilolar.map((filo) => (
+                          <SelectItem key={filo.filo_id} value={String(filo.filo_id)}>
+                            {filo.filo_adi}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <DialogFooter className="mt-6">
@@ -482,7 +559,8 @@ export default function SoforlerPage() {
                     <TableHead>Ad Soyad</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Telefon</TableHead>
-                    <TableHead>Rol</TableHead>
+                    <TableHead>Şirket</TableHead>
+                    <TableHead>Filo</TableHead>
                     <TableHead>Durum</TableHead>
                     <TableHead className="text-right">İşlemler</TableHead>
                   </TableRow>
@@ -490,7 +568,7 @@ export default function SoforlerPage() {
                 <TableBody>
                   {filteredSoforler.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                         <AlertCircle className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                         <p>Şoför bulunamadı</p>
                       </TableCell>
@@ -502,9 +580,18 @@ export default function SoforlerPage() {
                         <TableCell>{sofor.email}</TableCell>
                         <TableCell>{sofor.telefon}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">
-                            {rolOptions.find(o => o.value === sofor.rol)?.label || sofor.rol}
-                          </Badge>
+                          {sofor.sirket_adi ? (
+                            <Badge variant="outline">{sofor.sirket_adi}</Badge>
+                          ) : (
+                            <span className="text-gray-400 text-sm">Atanmamış</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {sofor.filo_adi ? (
+                            <Badge variant="outline">{sofor.filo_adi}</Badge>
+                          ) : (
+                            <span className="text-gray-400 text-sm">Atanmamış</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge className={sofor.durum ? 'bg-green-500' : 'bg-gray-500'}>

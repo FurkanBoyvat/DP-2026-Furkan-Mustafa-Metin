@@ -2,10 +2,18 @@ const express = require('express');
 const router = express.Router();
 const yakitController = require('../controllers/yakitController');
 
+// --- Şoför Bazlı Yakıt Kayıtları (ÖNCE tanımlanmalı!) ---
+router.get('/sofor/kayitlar', yakitController.getAllSoforYakitKayitlari);
+router.get('/sofor/leaderboard', yakitController.getSoforLeaderboard);
+router.get('/sofor/leaderboard/arac-tipi', yakitController.getSoforLeaderboardByAracTipi);
+router.post('/sofor/kayitlar', yakitController.createSoforYakitKaydi);
+router.put('/sofor/kayitlar/:kayit_id', yakitController.updateSoforYakitKaydi);
+router.delete('/sofor/kayitlar/:kayit_id', yakitController.deleteSoforYakitKaydi);
+
 // Tüm yakıt tüketim kayıtlarını listele
 router.get('/', yakitController.getAllYakitKayitlari);
 
-// Aylık yakıt raporu (/:kayit_id'dan ÖNCE tanımlanmalı!)
+// Aylık yakıt raporu
 router.get('/rapor/aylik', yakitController.getAylikYakitRaporu);
 
 // Araca göre yakıt kayıtlarını getir
