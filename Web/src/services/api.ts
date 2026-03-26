@@ -191,27 +191,3 @@ export const authAPI = {
   register: (data: any) => fetchWithAuth('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   getProfile: () => fetchWithAuth('/auth/profile'),
 };
-
-// Geofencing API
-export const geofencingAPI = {
-  // Bölge kaydet (GeoJSON → PostGIS)
-  saveRegion: (data: { arac_id: number; region_name: string; region_type?: string; geojson: any }) =>
-    fetchWithAuth('/geofencing/region/save', { method: 'POST', body: JSON.stringify(data) }),
-
-  // Araç için aktif bölgeyi getir
-  getRegion: (arac_id: number) =>
-    fetchWithAuth(`/geofencing/region/${arac_id}`),
-
-  // Konum gönder + ihlal kontrol et
-  checkLocation: (data: { arac_id: number; enlem: number; boylam: number; hiz?: number }) =>
-    fetchWithAuth('/geofencing/location/check', { method: 'POST', body: JSON.stringify(data) }),
-
-  // Araç ihlal geçmişi
-  getViolations: (arac_id: number, limit = 20) =>
-    fetchWithAuth(`/geofencing/violations/${arac_id}?limit=${limit}`),
-
-  // Tüm ihlaller
-  getAllViolations: (limit = 50) =>
-    fetchWithAuth(`/geofencing/violations?limit=${limit}`),
-};
-

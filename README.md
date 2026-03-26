@@ -1,19 +1,15 @@
-# 🚗 Araç Takip Sistemi
+# 🚗 Araç Takip Sistemi Web - Mobil - Api
+
+# Görseller
+<img width="1413" height="1015" alt="image" src="https://github.com/user-attachments/assets/1e68ec2a-e04b-4f54-bf5d-31c022e70df8" />
+<img width="624" height="239" alt="image" src="https://github.com/user-attachments/assets/7e609ec6-a038-438c-b3ce-938c7bf4899a" />
+<img width="1916" height="986" alt="image" src="https://github.com/user-attachments/assets/76d6cc78-8b35-425f-8321-e781630a5458" />
+<img width="1913" height="985" alt="image" src="https://github.com/user-attachments/assets/48a26ddd-0747-4893-a30a-c37a85a78692" />
+<img width="860" height="704" alt="image" src="https://github.com/user-attachments/assets/e286ef30-b588-4e9a-9802-2238d82a46bd" />
+<img width="777" height="839" alt="image" src="https://github.com/user-attachments/assets/7917545e-03f8-4863-9a21-483f2e089aaa" />
+<img width="1905" height="382" alt="image" src="https://github.com/user-attachments/assets/326d8144-c445-46f8-94cd-b789525ae32f" />
 
 Kapsamlı araç filo yönetim ve GPS takip sistemi. Şirketlerin araçlarını gerçek zamanlı olarak takip etmelerini, yönetmelerini ve raporlamalarını sağlayan modern bir web uygulaması.
-
-## 📋 İçindekiler
-
-- [Özellikler](#-özellikler)
-- [Teknoloji Yığını](#-teknoloji-yığını)
-- [Proje Yapısı](#-proje-yapısı)
-- [Kurulum](#-kurulum)
-- [Veritabanı](#-veritabanı)
-- [API Dokümantasyonu](#-api-dokümantasyonu)
-- [Kullanım](#-kullanım)
-- [Ekran Görüntüleri](#-ekran-görüntüleri)
-- [Katkıda Bulunma](#-katkıda-bulunma)
-- [Lisans](#-lisans)
 
 ## ✨ Özellikler
 

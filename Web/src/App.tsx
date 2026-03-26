@@ -19,7 +19,6 @@ import KisitliAlanlar from './pages/KisitliAlanlar';
 import BolgeIhlalleri from './pages/BolgeIhlalleri';
 import Kullanicilar from './pages/Kullanicilar';
 import Bildirimler from './pages/Bildirimler';
-import CanliTakip from './pages/CanliTakip';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -72,7 +71,6 @@ function App() {
             <Route path="/bolge-ihlalleri" element={<BolgeIhlalleri />} />
             <Route path="/kullanicilar" element={<Kullanicilar />} />
             <Route path="/bildirimler" element={<Bildirimler />} />
-            <Route path="/canli-takip" element={<CanliTakip />} />
           </Route>
         </Routes>
       </Router>

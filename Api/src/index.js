@@ -65,8 +65,6 @@ const bolgeIhlalRoutes = require('./routes/bolgeIhlalRoutes');
 const aracSoforRoutes = require('./routes/aracSoforRoutes');
 const sirketYoneticiRoutes = require('./routes/sirketYoneticiRoutes');
 const sirketDetayRoutes = require('./routes/sirketDetayRoutes');
-const geofencingRoutes = require('./routes/geofencingRoutes');
-
 
 // ============== API ENDPOINTS ==============
 app.use('/api/auth', authRoutes);
@@ -83,8 +81,6 @@ app.use('/api/bolge-ihlalleri', bolgeIhlalRoutes);
 app.use('/api/arac-soforleri', aracSoforRoutes);
 app.use('/api/sirket-yoneticileri', sirketYoneticiRoutes);
 app.use('/api/sirket-detaylari', sirketDetayRoutes);
-app.use('/api/geofencing', geofencingRoutes);
-
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -294,7 +290,7 @@ const startServer = async () => {
     console.log('');
     });
   } catch (error) {
-    console.error('❌ Sunucu başlatma hatası:', error);
+    console.error('❌ Sunucu başlatma hatası:', error.message);
     process.exit(1);
   }
 };

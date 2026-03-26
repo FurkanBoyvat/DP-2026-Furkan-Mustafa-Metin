@@ -1,2 +1,0 @@
-node . api
-npm run dev site
