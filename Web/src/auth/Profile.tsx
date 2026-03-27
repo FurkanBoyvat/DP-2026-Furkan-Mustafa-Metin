@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   User, 
   Mail, 
@@ -16,14 +15,25 @@ import {
   Truck,
   Settings,
   Bell,
-  FileText
+  FileText,
+  Save,
+  ChevronRight,
+  UserCircle,
+  ShieldCheck
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { Badge } from '../components/ui/badge';
+import { Separator } from '../components/ui/separator';
 import { toast } from 'sonner';
+import { authAPI } from '../services/api';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface UserProfile {
   kullanici_id: number;
@@ -37,350 +47,451 @@ interface UserProfile {
   son_giris_tarih: string;
 }
 
-const rolLabels: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+const rolLabels: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   admin: { 
     label: 'Sistem Yöneticisi', 
-    color: 'bg-purple-100 text-purple-800 border-purple-200',
-    icon: <Shield className="w-4 h-4" />
+    color: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    icon: Shield
   },
   sirket_yoneticisi: { 
     label: 'Şirket Yöneticisi', 
-    color: 'bg-blue-100 text-blue-800 border-blue-200',
-    icon: <Building2 className="w-4 h-4" />
+    color: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    icon: Building2
   },
-  surucu: { 
+  surucü: { 
     label: 'Sürücü', 
-    color: 'bg-green-100 text-green-800 border-green-200',
-    icon: <Truck className="w-4 h-4" />
+    color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    icon: Truck
   },
   muhasebe: { 
     label: 'Muhasebe', 
-    color: 'bg-orange-100 text-orange-800 border-orange-200',
-    icon: <FileText className="w-4 h-4" />
+    color: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+    icon: FileText
   },
 };
 
 export default function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'overview' | 'edit' | 'security'>('overview');
+  
+  // Edit Profile State
+  const [editForm, setEditForm] = useState({ ad: '', soyad: '', telefon: '' });
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Security State
+  const [passwordForm, setPasswordForm] = useState({ mevcutSifre: '', yeniSifre: '', yeniSifreTekrar: '' });
+  const [isChangingPass, setIsChangingPass] = useState(false);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-
-        const response = await fetch('http://localhost:3000/api/auth/profile', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          setProfile(data.kullanici);
-        } else {
-          setError(data.message || 'Profil bilgileri alınamadı');
-          if (data.code === 'INVALID_TOKEN') {
-            localStorage.removeItem('token');
-            navigate('/login');
-          }
-        }
-      } catch (err) {
-        setError('Sunucu ile bağlantı kurulamadı');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProfile();
-  }, [navigate]);
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    toast.success('Başarıyla çıkış yapıldı');
-    navigate('/login');
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const data = await authAPI.getProfile();
+      if (data.success) {
+        setProfile(data.kullanici);
+        setEditForm({
+          ad: data.kullanici.ad,
+          soyad: data.kullanici.soyad,
+          telefon: data.kullanici.telefon
+        });
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Profil bilgileri alınamadı');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsUpdating(true);
+      const data = await authAPI.updateProfile(editForm);
+      if (data.success) {
+        toast.success('Profil başarıyla güncellendi');
+        setProfile({ ...profile!, ...editForm });
+        setActiveTab('overview');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Güncelleme başarısız');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.yeniSifre !== passwordForm.yeniSifreTekrar) {
+      toast.error('Yeni şifreler eşleşmiyor');
+      return;
+    }
+
+    try {
+      setIsChangingPass(true);
+      const data = await authAPI.changePassword({
+        mevcutSifre: passwordForm.mevcutSifre,
+        yeniSifre: passwordForm.yeniSifre
+      });
+      if (data.success) {
+        toast.success('Şifre başarıyla değiştirildi');
+        setPasswordForm({ mevcutSifre: '', yeniSifre: '', yeniSifreTekrar: '' });
+        setActiveTab('overview');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Şifre değiştirme başarısız');
+    } finally {
+      setIsChangingPass(false);
+    }
   };
 
   const getInitials = (ad: string, soyad: string) => {
-    return `${ad.charAt(0)}${soyad.charAt(0)}`.toUpperCase();
-  };
-
-  const getRolBadge = (rol: string) => {
-    const rolInfo = rolLabels[rol] || { 
-      label: rol, 
-      color: 'bg-gray-100 text-gray-800 border-gray-200',
-      icon: <User className="w-4 h-4" />
-    };
-    
-    return (
-      <Badge variant="outline" className={`${rolInfo.color} font-medium px-3 py-1`}>
-        <span className="mr-1">{rolInfo.icon}</span>
-        {rolInfo.label}
-      </Badge>
-    );
+    return `${ad?.charAt(0) || ''}${soyad?.charAt(0) || ''}`.toUpperCase();
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-medium">Profil yükleniyor...</p>
+      <div className="flex h-[calc(100vh-80px)] items-center justify-center">
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 border-4 border-blue-500/20 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <XCircle className="w-8 h-8 text-red-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">Hata Oluştu</h3>
-            <p className="text-slate-500 mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()} className="w-full">
-              Tekrar Dene
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return null;
-  }
+  if (!profile) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800">Profilim</h1>
-            <p className="text-slate-500 mt-1">Hesap bilgilerinizi ve ayarlarınızı yönetin</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => toast.info('Bu özellik yakında gelecek')}>
-              <Settings className="w-4 h-4 mr-2" />
-              Ayarlar
-            </Button>
-            <Button variant="destructive" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Çıkış Yap
-            </Button>
-          </div>
+    <div className="min-h-screen bg-[#0B1120] p-6 lg:p-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Header with Title */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-extrabold text-white tracking-tight">Kullanıcı Profili</h1>
+          <p className="text-slate-400 mt-2 text-lg">Hesap ayarlarınızı ve kişisel bilgilerinizi buradan yönetebilirsiniz.</p>
         </div>
+        <div className="flex items-center gap-3">
+          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 px-4 py-2 text-sm font-semibold flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Sistem Aktif
+          </Badge>
+          <Button variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10 text-white transition-all" onClick={fetchProfile}>
+            <Clock className="w-4 h-4 mr-2" />
+            Yenile
+          </Button>
+        </div>
+      </div>
 
-        {/* Main Profile Card */}
-        <Card className="border-none shadow-xl bg-white/80 backdrop-blur-sm">
-          <CardContent className="p-8">
-            <div className="flex flex-col md:flex-row gap-8 items-start">
-              {/* Avatar Section */}
-              <div className="flex flex-col items-center gap-4">
-                <Avatar className="w-32 h-32 border-4 border-white shadow-lg">
-                  <AvatarImage src={`https://ui-avatars.com/api/?name=${profile.ad}+${profile.soyad}&background=random&color=fff&size=128`} />
-                  <AvatarFallback className="text-3xl bg-gradient-to-br from-primary to-primary/80 text-white">
-                    {getInitials(profile.ad, profile.soyad)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="text-center">
-                  <h2 className="text-xl font-bold text-slate-800">{profile.ad} {profile.soyad}</h2>
-                  <p className="text-slate-500 text-sm">{profile.email}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Left Sidebar - Navigation */}
+        <div className="lg:col-span-1 space-y-6">
+          <Card className="bg-[#111827]/50 border-white/5 backdrop-blur-xl shadow-2xl overflow-hidden">
+            <CardContent className="p-0">
+              <div className="p-6 flex flex-col items-center border-b border-white/5">
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full blur opacity-40 group-hover:opacity-60 transition duration-1000 group-hover:duration-200"></div>
+                  <Avatar className="w-24 h-24 border-2 border-white/10 relative">
+                    <AvatarImage src={`https://ui-avatars.com/api/?name=${profile.ad}+${profile.soyad}&background=0D8ABC&color=fff&size=128`} />
+                    <AvatarFallback className="bg-slate-800 text-2xl text-white">
+                      {getInitials(profile.ad, profile.soyad)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full border-2 border-[#111827] flex items-center justify-center text-white hover:bg-blue-500 transition-colors shadow-lg">
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <div className="flex gap-2">
-                  {getRolBadge(profile.rol)}
-                  <Badge variant={profile.durum ? "default" : "secondary"} className={profile.durum ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}>
-                    {profile.durum ? (
-                      <><CheckCircle2 className="w-3 h-3 mr-1" /> Aktif</>
-                    ) : (
-                      <><XCircle className="w-3 h-3 mr-1" /> Pasif</>
-                    )}
-                  </Badge>
-                </div>
-              </div>
-
-              <Separator orientation="vertical" className="hidden md:block h-48" />
-
-              {/* Info Grid */}
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                <Card className="bg-slate-50/50 border-slate-100">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <Mail className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Email</p>
-                      <p className="text-sm font-semibold text-slate-700">{profile.email}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-slate-50/50 border-slate-100">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                      <Phone className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Telefon</p>
-                      <p className="text-sm font-semibold text-slate-700">{profile.telefon}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-slate-50/50 border-slate-100">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Rol</p>
-                      <p className="text-sm font-semibold text-slate-700">
+                <h3 className="mt-4 text-lg font-bold text-white">{profile.ad} {profile.soyad}</h3>
+                <p className="text-sm text-slate-400 truncate w-full text-center">{profile.email}</p>
+                
+                <div className="mt-4 w-full">
+                  {(() => {
+                    const RolIcon = rolLabels[profile.rol]?.icon || User;
+                    return (
+                      <Badge variant="outline" className={cn("w-full justify-center py-2 border font-bold", rolLabels[profile.rol]?.color)}>
+                        <RolIcon className="w-4 h-4 mr-2" />
                         {rolLabels[profile.rol]?.label || profile.rol}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-slate-50/50 border-slate-100">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                      <Calendar className="w-5 h-5 text-orange-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Kayıt Tarihi</p>
-                      <p className="text-sm font-semibold text-slate-700">
-                        {new Date(profile.olusturulma_tarihi).toLocaleDateString('tr-TR', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
+                      </Badge>
+                    );
+                  })()}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Stats & Activity */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* User ID Card */}
-          <Card className="border-none shadow-lg bg-gradient-to-br from-primary/5 to-primary/10">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500 font-medium">Kullanıcı ID</p>
-                  <p className="text-2xl font-bold text-slate-800">#{profile.kullanici_id}</p>
-                </div>
-                <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-                  <User className="w-6 h-6 text-primary" />
-                </div>
+              <div className="p-2">
+                {[
+                  { id: 'overview', label: 'Genel Bakış', icon: UserCircle },
+                  { id: 'edit', label: 'Profili Düzenle', icon: Edit3 },
+                  { id: 'security', label: 'Güvenlik Ayarları', icon: Key }
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id as any)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300",
+                        activeTab === item.id 
+                          ? "bg-blue-600/10 text-blue-400 border border-blue-500/20" 
+                          : "text-slate-400 hover:text-white hover:bg-white/5"
+                      )}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {item.label}
+                      {activeTab === item.id && <ChevronRight className="w-4 h-4 ml-auto" />}
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
 
-          {/* Last Login */}
-          <Card className="border-none shadow-lg bg-gradient-to-br from-blue-50 to-blue-100/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500 font-medium">Son Giriş</p>
-                  <p className="text-lg font-bold text-slate-800">
-                    {profile.son_giris_tarih 
-                      ? new Date(profile.son_giris_tarih).toLocaleDateString('tr-TR', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })
-                      : 'Bilgi yok'
-                    }
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-blue-600" />
-                </div>
+          <Card className="bg-gradient-to-br from-blue-600/10 to-indigo-600/10 border-white/5">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-600/20 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-blue-400" />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Account Status */}
-          <Card className="border-none shadow-lg bg-gradient-to-br from-green-50 to-green-100/50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-500 font-medium">Hesap Durumu</p>
-                  <p className={`text-lg font-bold ${profile.durum ? 'text-green-700' : 'text-red-700'}`}>
-                    {profile.durum ? 'Aktif' : 'Pasif'}
-                  </p>
-                </div>
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${profile.durum ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
-                  {profile.durum ? (
-                    <CheckCircle2 className="w-6 h-6 text-green-600" />
-                  ) : (
-                    <XCircle className="w-6 h-6 text-red-600" />
-                  )}
-                </div>
+              <div>
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Katılım Tarihi</p>
+                <p className="text-sm font-bold text-white">
+                  {new Date(profile.olusturulma_tarihi).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                </p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <Card className="border-none shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Settings className="w-5 h-5 text-primary" />
-              Hızlı İşlemler
-            </CardTitle>
-            <CardDescription>Hesap ayarlarınızı yönetin</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-primary hover:bg-primary/5" onClick={() => toast.info('Bu özellik yakında gelecek')}>
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Edit3 className="w-5 h-5 text-blue-600" />
-                </div>
-                <span className="text-sm font-medium">Profili Düzenle</span>
-              </Button>
+        {/* Right Content Area */}
+        <div className="lg:col-span-3">
+          {activeTab === 'overview' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+              {/* Account Overview Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="bg-[#1e293b]/40 border-white/10 backdrop-blur-xl shadow-xl">
+                  <CardHeader className="pb-2 border-b border-white/5">
+                    <CardTitle className="text-sm font-bold text-blue-400 uppercase tracking-widest">İletişim Bilgileri</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-5 pt-6">
+                    <div className="flex items-center gap-4 group">
+                      <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0 border border-blue-500/20 group-hover:bg-blue-500/20 transition-all">
+                        <Mail className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-tight mb-0.5">E-posta Adresi</p>
+                        <p className="text-base font-bold text-white truncate">{profile.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 group">
+                      <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0 border border-purple-500/20 group-hover:bg-purple-500/20 transition-all">
+                        <Phone className="w-6 h-6 text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-tight mb-0.5">Telefon Numarası</p>
+                        <p className="text-base font-bold text-white">{profile.telefon}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-primary hover:bg-primary/5" onClick={() => toast.info('Bu özellik yakında gelecek')}>
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Key className="w-5 h-5 text-amber-600" />
-                </div>
-                <span className="text-sm font-medium">Şifre Değiştir</span>
-              </Button>
+                <Card className="bg-[#1e293b]/40 border-white/10 backdrop-blur-xl shadow-xl">
+                  <CardHeader className="pb-2 border-b border-white/5">
+                    <CardTitle className="text-sm font-bold text-blue-400 uppercase tracking-widest">Hesap Durumu</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-5 pt-6">
+                    <div className="flex items-center gap-4 group">
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border transition-all",
+                        profile.durum ? "bg-emerald-500/10 border-emerald-500/20 group-hover:bg-emerald-500/20" : "bg-red-500/10 border-red-500/20 group-hover:bg-red-500/20"
+                      )}>
+                        {profile.durum ? <CheckCircle2 className="w-6 h-6 text-emerald-400" /> : <XCircle className="w-6 h-6 text-red-400" />}
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-tight mb-0.5">Mevcut Durum</p>
+                        <p className={cn("text-base font-bold", profile.durum ? "text-emerald-400" : "text-red-400")}>
+                          {profile.durum ? 'Sistem Aktif / Yayında' : 'Hesap Devre Dışı'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 group">
+                      <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0 border border-amber-500/20 group-hover:bg-amber-500/20 transition-all">
+                        <Clock className="w-6 h-6 text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-tight mb-0.5">Son Giriş Tarihi</p>
+                        <p className="text-base font-bold text-white">
+                          {profile.son_giris_tarih 
+                            ? new Date(profile.son_giris_tarih).toLocaleString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : 'Henüz giriş yapılmadı'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-primary hover:bg-primary/5" onClick={() => toast.info('Bu özellik yakında gelecek')}>
-                <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                  <Bell className="w-5 h-5 text-purple-600" />
-                </div>
-                <span className="text-sm font-medium">Bildirimler</span>
-              </Button>
-
-              <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2 border-slate-200 hover:border-primary hover:bg-primary/5" onClick={() => toast.info('Bu özellik yakında gelecek')}>
-                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-rose-600" />
-                </div>
-                <span className="text-sm font-medium">Gizlilik</span>
-              </Button>
+              {/* Activity Card */}
+              <Card className="bg-[#1e293b]/40 border-white/10 backdrop-blur-xl shadow-xl">
+                <CardHeader className="border-b border-white/5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-white">Son Etkinlikler</CardTitle>
+                      <CardDescription className="text-slate-400 font-medium">Hesabınızdaki son işlemler ve aktiviteler</CardDescription>
+                    </div>
+                    <Button variant="ghost" className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 font-bold">Tümünü Gör</Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6 font-medium">
+                    {[
+                      { action: 'Profil Güncelleme', time: 'Az önce', icon: Edit3, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+                      { action: 'Sisteme Giriş Yapıldı', time: '2 saat önce', icon: LogOut, flip: true, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+                      {action: 'Şifre Değiştirildi', time: 'Dün', icon: Key, color: 'text-orange-400', bg: 'bg-orange-400/10' }
+                    ].map((activity, idx) => (
+                      <div key={idx} className="flex items-center gap-4 group cursor-default">
+                        <div className={cn("w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", activity.bg)}>
+                          <activity.icon className={cn("w-5 h-5", activity.color, activity.flip && "rotate-180")} />
+                        </div>
+                        <div className="flex-1 border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                          <p className="text-sm font-semibold text-white group-hover:text-blue-400 transition-colors capitalize">{activity.action}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 tracking-wide">{activity.time}</p>
+                        </div>
+                        <Badge variant="ghost" className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 px-3 cursor-pointer hover:bg-white/5">Detay</Badge>
+                      </div>
+                    ))}
+                  </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+          )}
+
+          {activeTab === 'edit' && (
+            <Card className="bg-[#1e293b]/40 border-white/10 backdrop-blur-xl animate-in fade-in slide-in-from-right-4 duration-500 shadow-2xl">
+              <CardHeader className="border-b border-white/5">
+                <CardTitle className="text-2xl font-bold text-white">Profil Bilgilerini Düzenle</CardTitle>
+                <CardDescription className="text-slate-400 font-medium">Adınız, soyadınız ve iletişim bilgileriniz.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <form onSubmit={handleUpdateProfile} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-300 uppercase tracking-wide">Ad</label>
+                      <input 
+                        type="text" 
+                        value={editForm.ad}
+                        onChange={(e) => setEditForm({...editForm, ad: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-semibold"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-300 uppercase tracking-wide">Soyad</label>
+                      <input 
+                        type="text" 
+                        value={editForm.soyad}
+                        onChange={(e) => setEditForm({...editForm, soyad: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-semibold"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2 lg:col-span-2">
+                      <label className="text-sm font-bold text-slate-300 uppercase tracking-wide">Telefon Numarası</label>
+                      <input 
+                        type="tel" 
+                        value={editForm.telefon}
+                        onChange={(e) => setEditForm({...editForm, telefon: e.target.value})}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-semibold"
+                        placeholder="05XX XXX XX XX"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-6 border-t border-white/5">
+                    <Button type="button" variant="ghost" className="text-slate-400 hover:text-white font-bold" onClick={() => setActiveTab('overview')}>Vazgeç</Button>
+                    <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-10 h-12 font-bold shadow-lg shadow-blue-600/20" disabled={isUpdating}>
+                      {isUpdating ? (
+                        <span className="flex items-center gap-2">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Güncelleniyor...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Save className="w-5 h-5" />
+                          Değişiklikleri Kaydet
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'security' && (
+            <Card className="bg-[#1e293b]/40 border-white/10 backdrop-blur-xl animate-in fade-in slide-in-from-right-4 duration-500 shadow-2xl">
+              <CardHeader className="border-b border-white/5">
+                <CardTitle className="text-2xl font-bold text-white">Şifre Değiştir</CardTitle>
+                <CardDescription className="text-slate-400 font-medium">Hesap güvenliğiniz için güncel bir şifre kullanın.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <form onSubmit={handleChangePassword} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-300 uppercase tracking-wide">Mevcut Şifre</label>
+                      <div className="relative">
+                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                        <input 
+                          type="password" 
+                          value={passwordForm.mevcutSifre}
+                          onChange={(e) => setPasswordForm({...passwordForm, mevcutSifre: e.target.value})}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-semibold"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <Separator className="bg-white/5 my-8" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-300 uppercase tracking-wide">Yeni Şifre</label>
+                        <input 
+                          type="password" 
+                          value={passwordForm.yeniSifre}
+                          onChange={(e) => setPasswordForm({...passwordForm, yeniSifre: e.target.value})}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-semibold"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-300 uppercase tracking-wide">Yeni Şifre (Tekrar)</label>
+                        <input 
+                          type="password" 
+                          value={passwordForm.yeniSifreTekrar}
+                          onChange={(e) => setPasswordForm({...passwordForm, yeniSifreTekrar: e.target.value})}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-semibold"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-6 border-t border-white/5">
+                    <Button type="button" variant="ghost" className="text-slate-400 hover:text-white font-bold" onClick={() => setActiveTab('overview')}>Vazgeç</Button>
+                    <Button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl px-10 h-12 font-bold shadow-lg shadow-emerald-600/20" disabled={isChangingPass}>
+                      {isChangingPass ? (
+                        <span className="flex items-center gap-2">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Değiştiriliyor...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <ShieldCheck className="w-5 h-5" />
+                          Şifreyi Güncelle
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );

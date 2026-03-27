@@ -190,4 +190,32 @@ export const authAPI = {
   login: (email: string, sifre: string) => fetchWithAuth('/auth/login', { method: 'POST', body: JSON.stringify({ email, sifre }) }),
   register: (data: any) => fetchWithAuth('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   getProfile: () => fetchWithAuth('/auth/profile'),
+  updateProfile: (data: { ad: string; soyad: string; telefon: string }) => 
+    fetchWithAuth('/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  changePassword: (data: { mevcutSifre: string; yeniSifre: string }) => 
+    fetchWithAuth('/auth/change-password', { method: 'PUT', body: JSON.stringify(data) }),
 };
+
+// Geofencing API
+export const geofencingAPI = {
+  // Bölge kaydet (GeoJSON → PostGIS)
+  saveRegion: (data: { arac_id: number; region_name: string; region_type?: string; geojson: any }) =>
+    fetchWithAuth('/geofencing/region/save', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Araç için aktif bölgeyi getir
+  getRegion: (arac_id: number) =>
+    fetchWithAuth(`/geofencing/region/${arac_id}`),
+
+  // Konum gönder + ihlal kontrol et
+  checkLocation: (data: { arac_id: number; enlem: number; boylam: number; hiz?: number }) =>
+    fetchWithAuth('/geofencing/location/check', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Araç ihlal geçmişi
+  getViolations: (arac_id: number, limit = 20) =>
+    fetchWithAuth(`/geofencing/violations/${arac_id}?limit=${limit}`),
+
+  // Tüm ihlaller
+  getAllViolations: (limit = 50) =>
+    fetchWithAuth(`/geofencing/violations?limit=${limit}`),
+};
+

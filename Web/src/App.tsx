@@ -19,6 +19,7 @@ import KisitliAlanlar from './pages/KisitliAlanlar';
 import BolgeIhlalleri from './pages/BolgeIhlalleri';
 import Kullanicilar from './pages/Kullanicilar';
 import Bildirimler from './pages/Bildirimler';
+import CanliTakip from './pages/CanliTakip';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -52,14 +53,10 @@ function App() {
             path="/register" 
             element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />} 
           />
-          <Route 
-            path="/profile" 
-            element={isAuthenticated ? <Profile /> : <Navigate to="/login" replace />} 
-          />
-          
           {/* Protected Routes with Layout */}
           <Route element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/araclar" element={<Araclar />} />
             <Route path="/soforler" element={<Soforler />} />
             <Route path="/filolar" element={<Filolar />} />
@@ -71,6 +68,7 @@ function App() {
             <Route path="/bolge-ihlalleri" element={<BolgeIhlalleri />} />
             <Route path="/kullanicilar" element={<Kullanicilar />} />
             <Route path="/bildirimler" element={<Bildirimler />} />
+            <Route path="/canli-takip" element={<CanliTakip />} />
           </Route>
         </Routes>
       </Router>

@@ -11,4 +11,10 @@ router.post('/register', authController.register);
 // Profil
 router.get('/profile', authController.profil);
 
+// Profil Güncelleme
+router.put('/profile', authController.updateProfile);
+
+// Şifre Değiştirme
+router.put('/change-password', authController.changePassword);
+
 module.exports = router;
