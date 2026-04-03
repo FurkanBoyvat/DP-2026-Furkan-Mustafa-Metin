@@ -45,10 +45,19 @@ exports.getSirketById = async (req, res) => {
       [sirket_id]
     );
 
+    // İstatistikleri al
+    const statsResult = await pool.query(`
+      SELECT 
+        (SELECT COUNT(*) FROM filolar WHERE sirket_id = $1) as filo_sayisi,
+        (SELECT COUNT(*) FROM araclar WHERE sirket_id = $1) as arac_sayisi,
+        (SELECT COUNT(*) FROM sirket_yoneticileri WHERE sirket_id = $1) as yonetici_sayisi
+    `, [sirket_id]);
+
     return res.status(200).json({
       success: true,
       sirket: sirketResult.rows[0],
-      detaylar: detailResult.rows[0] || null
+      detaylar: detailResult.rows[0] || null,
+      istatistikler: statsResult.rows[0]
     });
   } catch (error) {
     console.error('Şirket Detay Hatası:', error);

@@ -47,6 +47,7 @@ export const aracAPI = {
 export const soforAPI = {
   getAll: () => fetchWithAuth('/kullanicilar/soforler/all'),
   getById: (kullanici_id: number) => fetchWithAuth(`/kullanicilar/${kullanici_id}`),
+  getIstatistikler: (kullanici_id: number) => fetchWithAuth(`/kullanicilar/soforler/${kullanici_id}/istatistikler`),
   create: (data: any) => fetchWithAuth('/kullanicilar', { method: 'POST', body: JSON.stringify(data) }),
   update: (kullanici_id: number, data: any) => fetchWithAuth(`/kullanicilar/${kullanici_id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (kullanici_id: number) => fetchWithAuth(`/kullanicilar/${kullanici_id}`, { method: 'DELETE' }),

@@ -146,9 +146,15 @@ exports.addKmKayidi = async (req, res) => {
       [arac_id, eski_km, yeni_km, bakım_gerekli || false, notlar]
     );
 
+    // Ana araç tablosunu güncelle
+    await pool.query(
+      'UPDATE araclar SET mevcut_km = $1, guncelleme_tarihi = CURRENT_TIMESTAMP WHERE arac_id = $2',
+      [yeni_km, arac_id]
+    );
+
     return res.status(201).json({
       success: true,
-      message: 'KM kaydı başarıyla eklendi',
+      message: 'KM kaydı başarıyla eklendi ve araç güncellendi',
       km_kayidi: result.rows[0]
     });
   } catch (error) {

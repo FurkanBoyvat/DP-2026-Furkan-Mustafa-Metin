@@ -8,8 +8,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Plus, Edit2, Trash2, Search, Truck, AlertCircle, BarChart3 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Plus, Edit2, Trash2, Search, Truck, AlertCircle, BarChart3, Building2, User, Phone, Info, Mail } from 'lucide-react';
 import { toast } from 'sonner';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface Filo {
   filo_id: number;
@@ -354,62 +361,170 @@ export default function FilolarPage() {
         </CardContent>
       </Card>
 
-      {/* İstatistik Dialog */}
+      {/* İstatistik & Detay Dialog */}
       <Dialog open={isIstatistikOpen} onOpenChange={setIsIstatistikOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-red-500" />
-              {selectedFilo?.filo_adi} - İstatistikler
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {selectedFilo && istatistikler[selectedFilo.filo_id] ? (
-              <div className="grid grid-cols-2 gap-4">
-                <Card className="bg-blue-50">
-                  <CardContent className="p-4">
-                    <p className="text-sm text-blue-600 font-medium">Toplam Araç</p>
-                    <p className="text-2xl font-bold text-blue-800">
-                      {istatistikler[selectedFilo.filo_id].toplam_arac}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-green-50">
-                  <CardContent className="p-4">
-                    <p className="text-sm text-green-600 font-medium">Aktif Araç</p>
-                    <p className="text-2xl font-bold text-green-800">
-                      {istatistikler[selectedFilo.filo_id].aktif_arac}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-gray-50">
-                  <CardContent className="p-4">
-                    <p className="text-sm text-gray-600 font-medium">Pasif Araç</p>
-                    <p className="text-2xl font-bold text-gray-800">
-                      {istatistikler[selectedFilo.filo_id].pasif_arac}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-orange-50">
-                  <CardContent className="p-4">
-                    <p className="text-sm text-orange-600 font-medium">Toplam KM</p>
-                    <p className="text-2xl font-bold text-orange-800">
-                      {Math.round(istatistikler[selectedFilo.filo_id].toplam_km).toLocaleString('tr-TR')} km
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            ) : (
-              <div className="flex justify-center py-8">
-                <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
+        <DialogContent className="max-w-2xl border-0 shadow-2xl p-0 overflow-hidden bg-white/95 backdrop-blur-xl">
+          <div className="bg-gradient-to-r from-red-600/10 to-red-600/5 p-6 border-b border-red-500/10">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-2xl font-black text-slate-800">
+                <div className="w-10 h-10 rounded-xl bg-red-500 text-white flex items-center justify-center shadow-lg shadow-red-500/30">
+                  <BarChart3 className="w-6 h-6" />
+                </div>
+                {selectedFilo?.filo_adi} - Filo Kontrol Paneli
+              </DialogTitle>
+            </DialogHeader>
           </div>
-          <DialogFooter>
+
+          <div className="p-6">
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6 bg-slate-100/50 p-1 rounded-xl">
+                <TabsTrigger value="overview" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-white data-[state=active]:shadow-sm">Performans Özeti</TabsTrigger>
+                <TabsTrigger value="details" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-white data-[state=active]:shadow-sm">Yönetimsel Detaylar</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {selectedFilo && (
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Organizasyon Yapısı</span>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="w-3.5 h-3.5 text-red-500" />
+                        <span className="text-sm font-bold text-slate-600">{getSirketAdi(selectedFilo.sirket_id)}</span>
+                      </div>
+                    </div>
+                    <Badge className={cn("px-4 py-1.5 rounded-full font-black text-xs uppercase tracking-tighter shadow-sm border-0", selectedFilo.durum ? "bg-emerald-500 text-white" : "bg-slate-400 text-white")}>
+                      {selectedFilo.durum ? 'Operasyonel / Aktif' : 'Pasif Durumda'}
+                    </Badge>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedFilo && istatistikler[selectedFilo.filo_id] ? (
+                    <>
+                      <Card className="relative overflow-hidden group border-0 bg-gradient-to-br from-blue-500 to-blue-600 shadow-xl shadow-blue-500/20 col-span-1">
+                        <div className="absolute top-0 right-0 p-1 opacity-10 group-hover:scale-150 transition-transform duration-700">
+                          <Truck className="w-20 h-20 text-white" />
+                        </div>
+                        <CardContent className="p-5 relative z-10 flex flex-col justify-between h-32">
+                          <div className="bg-white/20 w-8 h-8 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/30">
+                            <Truck className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">Toplam Varlık</p>
+                            <div className="flex items-baseline gap-1">
+                              <h4 className="text-4xl font-black text-white tracking-tighter">
+                                {istatistikler[selectedFilo.filo_id].toplam_arac}
+                              </h4>
+                              <span className="text-xs font-bold text-white/60">ARAÇ</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="relative overflow-hidden group border-0 bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-xl shadow-emerald-500/20 col-span-1">
+                        <div className="absolute top-0 right-0 p-1 opacity-10 group-hover:scale-150 transition-transform duration-700">
+                          <Truck className="w-20 h-20 text-white" />
+                        </div>
+                        <CardContent className="p-5 relative z-10 flex flex-col justify-between h-32">
+                          <div className="bg-white/20 w-8 h-8 rounded-lg flex items-center justify-center backdrop-blur-md border border-white/30">
+                            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">Aktif Operasyon</p>
+                            <div className="flex items-baseline gap-1">
+                              <h4 className="text-4xl font-black text-white tracking-tighter">
+                                {istatistikler[selectedFilo.filo_id].aktif_arac}
+                              </h4>
+                              <span className="text-xs font-bold text-white/60">AKTİF</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="relative overflow-hidden group border-0 bg-white ring-1 ring-slate-200 shadow-sm col-span-1">
+                        <CardContent className="p-5 flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                            <Truck className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bekleyen Araç</p>
+                            <h4 className="text-xl font-black text-slate-900">{istatistikler[selectedFilo.filo_id].pasif_arac}</h4>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="relative overflow-hidden group border-0 bg-slate-900 shadow-xl col-span-1">
+                        <CardContent className="p-5 flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-2xl bg-white/10 text-white flex items-center justify-center shrink-0">
+                            <BarChart3 className="w-6 h-6 text-red-500" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Kümülatif Mesafe</p>
+                            <h4 className="text-xl font-black text-white font-mono">
+                              {Number(istatistikler[selectedFilo.filo_id].toplam_km || 0).toLocaleString('tr-TR')} <span className="text-xs font-bold text-slate-500">KM</span>
+                            </h4>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </>
+                  ) : (
+                    <div className="col-span-2 flex flex-col items-center justify-center py-12 space-y-4">
+                      <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Veriler Çekiliyor...</p>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="details" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                 {selectedFilo && (
+                   <div className="grid grid-cols-1 gap-6">
+                      <div className="group bg-slate-50 p-6 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
+                            <User className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Filo Müdürü / Sorumlusu</p>
+                            <h4 className="text-xl font-black text-slate-900 tracking-tight">
+                               {selectedFilo.filo_muduru_ad ? `${selectedFilo.filo_muduru_ad} ${selectedFilo.filo_muduru_soyad}` : 'Atanmamış'}
+                            </h4>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                           <div className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-slate-100">
+                             <Phone className="w-4 h-4 text-emerald-500" />
+                             <span className="text-sm font-bold text-slate-700">{selectedFilo.filo_muduru_telefon || 'İletişim Bilgisi Yok'}</span>
+                           </div>
+                           <div className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border border-slate-100">
+                             <Mail className="w-4 h-4 text-blue-500" />
+                             <span className="text-sm font-bold text-slate-700">Kurumsal E-Posta Bekleniyor</span>
+                           </div>
+                        </div>
+                      </div>
+
+                      <div className="group bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                         <div className="flex items-center gap-3 mb-3">
+                            <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                               <Info className="w-4 h-4" />
+                            </div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Filo Tanımı & Notlar</span>
+                         </div>
+                         <p className="text-slate-600 text-sm leading-relaxed font-medium pl-11">
+                            {selectedFilo.aciklama || 'Bu filo için henüz detaylı bir açıklama girişi yapılmamıştır. Şirket personeli ile iletişime geçiniz.'}
+                         </p>
+                      </div>
+                   </div>
+                 )}
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
             <DialogClose asChild>
-              <Button variant="outline">Kapat</Button>
+              <Button className="bg-slate-900 text-white hover:bg-black font-black uppercase tracking-widest text-[10px] px-8 h-10 shadow-lg shadow-slate-900/20">Kapat</Button>
             </DialogClose>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -145,9 +145,10 @@ exports.getFiloIstatistikleri = async (req, res) => {
     const result = await pool.query(
       `SELECT 
         f.filo_id, f.filo_adi,
-        COUNT(a.arac_id) AS toplam_arac,
-        SUM(CASE WHEN a.durum = true THEN 1 ELSE 0 END) AS aktif_arac,
-        SUM(CASE WHEN a.durum = false THEN 1 ELSE 0 END) AS pasif_arac
+        COALESCE(COUNT(a.arac_id), 0) AS toplam_arac,
+        COALESCE(SUM(CASE WHEN a.durum = true THEN 1 ELSE 0 END), 0) AS aktif_arac,
+        COALESCE(SUM(CASE WHEN a.durum = false THEN 1 ELSE 0 END), 0) AS pasif_arac,
+        COALESCE(SUM(a.mevcut_km), 0) AS toplam_km
        FROM filolar f
        LEFT JOIN araclar a ON f.filo_id = a.filo_id
        WHERE f.filo_id = $1

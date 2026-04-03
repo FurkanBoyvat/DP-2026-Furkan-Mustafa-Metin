@@ -8,8 +8,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Plus, Edit2, Trash2, Search, Car, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Car, AlertCircle, Wrench, ShieldCheck, FileText, Calendar, TrendingUp, History, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface Arac {
   arac_id: number;
@@ -24,8 +30,17 @@ interface Arac {
   vin_no?: string;
   motor_no?: string;
   yakit_tipi?: string;
+  alis_km?: number;
+  alis_fiyat?: number;
+  alis_tarihi?: string;
+  mevcut_km?: number;
   durum: boolean;
   olusturulma_tarihi: string;
+  sigorta_numarasi?: string;
+  sigorta_baslangic_tarihi?: string;
+  sigorta_bitis_tarihi?: string;
+  teknik_muayene_tarihi?: string;
+  son_bakım_tarihi?: string;
 }
 
 interface Filo {
@@ -77,7 +92,18 @@ export default function AraclarPage() {
     vin_no: '',
     motor_no: '',
     yakit_tipi: '',
+    alis_km: 0,
+    alis_fiyat: 0,
+    alis_tarihi: new Date().toISOString().split('T')[0],
+    sigorta_numarasi: '',
+    sigorta_baslangic_tarihi: '',
+    sigorta_bitis_tarihi: '',
+    teknik_muayene_tarihi: '',
+    son_bakım_tarihi: '',
   });
+
+  const [selectedAracDetay, setSelectedAracDetay] = useState<Arac | null>(null);
+  const [isDetayOpen, setIsDetayOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -109,6 +135,8 @@ export default function AraclarPage() {
         filo_id: parseInt(formData.filo_id),
         sirket_id: parseInt(formData.sirket_id),
         yil: parseInt(String(formData.yil)),
+        alis_km: parseFloat(String(formData.alis_km)),
+        alis_fiyat: parseFloat(String(formData.alis_fiyat)),
       };
 
       if (editingArac) {
@@ -151,6 +179,14 @@ export default function AraclarPage() {
       vin_no: arac.vin_no || '',
       motor_no: arac.motor_no || '',
       yakit_tipi: arac.yakit_tipi || '',
+      alis_km: arac.alis_km || 0,
+      alis_fiyat: arac.alis_fiyat || 0,
+      alis_tarihi: arac.alis_tarihi?.split('T')[0] || new Date().toISOString().split('T')[0],
+      sigorta_numarasi: arac.sigorta_numarasi || '',
+      sigorta_baslangic_tarihi: arac.sigorta_baslangic_tarihi?.split('T')[0] || '',
+      sigorta_bitis_tarihi: arac.sigorta_bitis_tarihi?.split('T')[0] || '',
+      teknik_muayene_tarihi: arac.teknik_muayene_tarihi?.split('T')[0] || '',
+      son_bakım_tarihi: arac.son_bakım_tarihi?.split('T')[0] || '',
     });
     setIsDialogOpen(true);
   };
@@ -169,6 +205,14 @@ export default function AraclarPage() {
       vin_no: '',
       motor_no: '',
       yakit_tipi: '',
+      alis_km: 0,
+      alis_fiyat: 0,
+      alis_tarihi: new Date().toISOString().split('T')[0],
+      sigorta_numarasi: '',
+      sigorta_baslangic_tarihi: '',
+      sigorta_bitis_tarihi: '',
+      teknik_muayene_tarihi: '',
+      son_bakım_tarihi: '',
     });
   };
 
@@ -350,6 +394,94 @@ export default function AraclarPage() {
                     placeholder="Motor numarası"
                   />
                 </div>
+                
+                <div className="border-t pt-4 sm:col-span-2">
+                  <h4 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-wider">Satın Alma Bilgileri</h4>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="alis_km">Alış Kilometresi (KM)</Label>
+                  <Input
+                    id="alis_km"
+                    type="number"
+                    value={formData.alis_km}
+                    onChange={(e) => setFormData({ ...formData, alis_km: parseFloat(e.target.value) })}
+                    placeholder="Örn: 10000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="alis_fiyat">Alış Fiyatı (₺)</Label>
+                  <Input
+                    id="alis_fiyat"
+                    type="number"
+                    value={formData.alis_fiyat}
+                    onChange={(e) => setFormData({ ...formData, alis_fiyat: parseFloat(e.target.value) })}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="alis_tarihi">Alış Tarihi</Label>
+                  <Input
+                    id="alis_tarihi"
+                    type="date"
+                    value={formData.alis_tarihi}
+                    onChange={(e) => setFormData({ ...formData, alis_tarihi: e.target.value })}
+                  />
+                </div>
+
+                <div className="border-t pt-4 sm:col-span-2">
+                  <h4 className="text-sm font-bold text-slate-500 mb-4 uppercase tracking-wider">Muayene & Sigorta Bilgileri</h4>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="teknik_muayene_tarihi">Muayene Bitiş Tarihi (TÜVTÜRK)</Label>
+                  <Input
+                    id="teknik_muayene_tarihi"
+                    type="date"
+                    value={formData.teknik_muayene_tarihi}
+                    onChange={(e) => setFormData({ ...formData, teknik_muayene_tarihi: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="son_bakım_tarihi">Son Bakım Tarihi</Label>
+                  <Input
+                    id="son_bakım_tarihi"
+                    type="date"
+                    value={formData.son_bakım_tarihi}
+                    onChange={(e) => setFormData({ ...formData, son_bakım_tarihi: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                   <Label htmlFor="sigorta_numarasi">Sigorta / Kasko Poliçe No</Label>
+                   <Input
+                     id="sigorta_numarasi"
+                     value={formData.sigorta_numarasi}
+                     onChange={(e) => setFormData({ ...formData, sigorta_numarasi: e.target.value })}
+                     placeholder="POL-12345678"
+                   />
+                </div>
+
+                <div className="space-y-2">
+                   <Label htmlFor="sigorta_baslangic_tarihi">Sigorta Başlangıç</Label>
+                   <Input
+                     id="sigorta_baslangic_tarihi"
+                     type="date"
+                     value={formData.sigorta_baslangic_tarihi}
+                     onChange={(e) => setFormData({ ...formData, sigorta_baslangic_tarihi: e.target.value })}
+                   />
+                </div>
+
+                <div className="space-y-2">
+                   <Label htmlFor="sigorta_bitis_tarihi">Sigorta Bitiş</Label>
+                   <Input
+                     id="sigorta_bitis_tarihi"
+                     type="date"
+                     value={formData.sigorta_bitis_tarihi}
+                     onChange={(e) => setFormData({ ...formData, sigorta_bitis_tarihi: e.target.value })}
+                   />
+                </div>
               </div>
               <DialogFooter className="mt-6">
                 <DialogClose asChild>
@@ -391,10 +523,9 @@ export default function AraclarPage() {
                   <TableRow>
                     <TableHead>Plaka</TableHead>
                     <TableHead>Marka/Model</TableHead>
-                    <TableHead>Yıl</TableHead>
+                    <TableHead>Kilometre (Gelişim)</TableHead>
                     <TableHead>Araç Tipi</TableHead>
-                    <TableHead>Filo</TableHead>
-                    <TableHead>Şirket</TableHead>
+                    <TableHead>Filo/Şirket</TableHead>
                     <TableHead>Durum</TableHead>
                     <TableHead className="text-right">İşlemler</TableHead>
                   </TableRow>
@@ -410,18 +541,48 @@ export default function AraclarPage() {
                   ) : (
                     filteredAraclar.map((arac) => (
                       <TableRow key={arac.arac_id}>
-                        <TableCell className="font-medium">{arac.plaka}</TableCell>
-                        <TableCell>{arac.marka} {arac.model}</TableCell>
-                        <TableCell>{arac.yil}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-col">
+                            <span className="text-slate-900 font-bold">{arac.plaka}</span>
+                            <span className="text-xs text-slate-500">{arac.vin_no || 'VIN Yok'}</span>
+                          </div>
+                        </TableCell>
                         <TableCell>
-                          <Badge variant="outline">
+                          <div className="flex flex-col">
+                            <span className="font-semibold">{arac.marka} {arac.model}</span>
+                            <span className="text-xs text-slate-500">{arac.yil} model</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1.5 w-48">
+                            <div className="flex justify-between text-xs font-bold">
+                              <span className="text-slate-400">Başlangıç: {arac.alis_km?.toLocaleString() || 0}</span>
+                              <span className="text-red-500">Güncel: {arac.mevcut_km?.toLocaleString() || 0}</span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                              <div 
+                                className="h-full bg-gradient-to-r from-red-400 to-red-600 transition-all duration-1000" 
+                                style={{ width: `${Math.min(100, Math.max(5, ((arac.mevcut_km || 0) / (arac.mevcut_km || 1)) * 100))}%` }}
+                              />
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                              Toplam Kat Edilen: {( (arac.mevcut_km || 0) - (arac.alis_km || 0) ).toLocaleString()} KM
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-slate-50">
                             {aracTipiOptions.find(o => o.value === arac.arac_tipi)?.label || arac.arac_tipi || '-'}
                           </Badge>
                         </TableCell>
-                        <TableCell>{getFiloAdi(arac.filo_id)}</TableCell>
-                        <TableCell>{getSirketAdi(arac.sirket_id)}</TableCell>
                         <TableCell>
-                          <Badge className={arac.durum ? 'bg-green-500' : 'bg-gray-500'}>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold">{getFiloAdi(arac.filo_id)}</span>
+                            <span className="text-[10px] text-slate-500 uppercase font-bold">{getSirketAdi(arac.sirket_id)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={cn("font-bold px-3 py-1", arac.durum ? 'bg-emerald-500' : 'bg-slate-500')}>
                             {arac.durum ? 'Aktif' : 'Pasif'}
                           </Badge>
                         </TableCell>
@@ -430,14 +591,24 @@ export default function AraclarPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleEdit(arac)}
+                              className="text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                              onClick={() => { setSelectedAracDetay(arac); setIsDetayOpen(true); }}
+                              title="Detaylar"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              <Car className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-red-500 hover:text-red-600"
+                              onClick={() => handleEdit(arac)}
+                              className="hover:bg-slate-100"
+                            >
+                              <Edit2 className="w-4 h-4 text-slate-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
                               onClick={() => handleDelete(arac.arac_id)}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -453,6 +624,189 @@ export default function AraclarPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Araç Detay Dialog */}
+      <Dialog open={isDetayOpen} onOpenChange={setIsDetayOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-2xl font-black">
+              <Car className="w-8 h-8 text-red-500" />
+              {selectedAracDetay?.plaka} - Araç Kartı
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+            <Card className="bg-slate-50 border-slate-200">
+              <CardContent className="p-6 space-y-4">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-l-2 border-red-500 pl-3">Künye Bilgileri</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Marka / Model</p>
+                    <p className="font-bold text-slate-900">{selectedAracDetay?.marka} {selectedAracDetay?.model}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Model Yılı</p>
+                    <p className="font-bold text-slate-900">{selectedAracDetay?.yil}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Araç Tipi</p>
+                    <p className="font-bold text-slate-900 capitalize">{selectedAracDetay?.arac_tipi}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Yakıt Tipi</p>
+                    <p className="font-bold text-slate-900 capitalize">{selectedAracDetay?.yakit_tipi}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-900 border-slate-800 text-white">
+              <CardContent className="p-6 space-y-6">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest border-l-2 border-red-500 pl-3">Kilometre Gelişimi</h4>
+                
+                <div className="space-y-4">
+                  <div className="flex justify-between items-end">
+                    <div className="text-center bg-white/5 rounded-lg p-3 flex-1 mr-2">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase">Satın Alma KM</p>
+                      <p className="text-xl font-black text-white">{selectedAracDetay?.alis_km?.toLocaleString()}</p>
+                    </div>
+                    <div className="text-center bg-red-500 rounded-lg p-3 flex-1 ml-2">
+                      <p className="text-[9px] font-bold text-white/70 uppercase">Güncel KM</p>
+                      <p className="text-xl font-black text-white">{selectedAracDetay?.mevcut_km?.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[10px] font-bold text-slate-400">
+                      <span>KULLANIM ORANI</span>
+                      <span className="text-red-400">{(( (selectedAracDetay?.mevcut_km || 0) - (selectedAracDetay?.alis_km || 0) ) / (selectedAracDetay?.mevcut_km || 1) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="h-3 w-full bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div 
+                        className="h-full bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)] transition-all duration-1000" 
+                        style={{ width: `${Math.min(100, Math.max(5, (( (selectedAracDetay?.mevcut_km || 0) - (selectedAracDetay?.alis_km || 0) ) / (selectedAracDetay?.mevcut_km || 1) * 100)))}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-400 text-center font-medium">Toplam <span className="text-white font-bold">{( (selectedAracDetay?.mevcut_km || 0) - (selectedAracDetay?.alis_km || 0) ).toLocaleString()} KM</span> yol kat edildi.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-2 bg-white border-slate-200 overflow-hidden">
+               <div className="bg-slate-900 px-6 py-3 flex justify-between items-center text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+                  <span>Teknik Operasyon Paketi</span>
+                  <div className="flex gap-4">
+                     <span className="text-emerald-500">Sistem Aktif</span>
+                     <span className="text-blue-500">Belgeler Onaylı</span>
+                  </div>
+               </div>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                   {/* Maintenance HUD */}
+                   <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wrench className="w-4 h-4 text-orange-500" />
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Bakım Tahmini</h4>
+                      </div>
+                      <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 text-center">
+                         <p className="text-[9px] font-black text-orange-600 uppercase mb-1">Sonraki Periyodik Bakım</p>
+                         <p className="text-2xl font-black text-orange-950">
+                            {Math.ceil((selectedAracDetay?.mevcut_km || 0) / 10000) * 10000} <span className="text-xs text-orange-800">KM</span>
+                         </p>
+                         <div className="mt-3 h-1.5 w-full bg-orange-200 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-orange-500" 
+                              style={{ width: `${((selectedAracDetay?.mevcut_km || 0) % 10000) / 100}%` }}
+                            />
+                         </div>
+                         <p className="text-[10px] font-bold text-orange-700/70 mt-2">
+                            Kritik Seviyeye {(10000 - ((selectedAracDetay?.mevcut_km || 0) % 10000)).toLocaleString()} KM Kaldı
+                         </p>
+                      </div>
+                   </div>
+
+                   {/* Documents HUD */}
+                   <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ShieldCheck className="w-4 h-4 text-blue-500" />
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Resmi Belgeler</h4>
+                      </div>
+                      <div className="space-y-3">
+                         <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <div className="flex items-center gap-2">
+                               <FileText className="w-3.5 h-3.5 text-slate-400" />
+                               <span className="text-[10px] font-bold text-slate-600">TÜVTÜRK Muayene</span>
+                            </div>
+                            <Badge className="bg-emerald-500 text-[9px]">142 GÜN</Badge>
+                         </div>
+                         <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                            <div className="flex items-center gap-2">
+                               <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+                               <span className="text-[10px] font-bold text-slate-600">Kasko / Sigorta</span>
+                            </div>
+                            <Badge className="bg-emerald-500 text-[9px]">215 GÜN</Badge>
+                         </div>
+                      </div>
+                   </div>
+
+                   {/* Cost/Usage Stats */}
+                   <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-4 h-4 text-red-500" />
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Kullanım Verimliliği</h4>
+                      </div>
+                      <div className="space-y-4">
+                         <div className="flex justify-between items-baseline">
+                            <span className="text-[10px] font-bold text-slate-400">AMORTİSMAN</span>
+                            <span className="text-sm font-black text-slate-900">%24.5</span>
+                         </div>
+                         <div className="flex justify-between items-baseline">
+                            <span className="text-[10px] font-bold text-slate-400">GÜNLÜK ORT. KM</span>
+                            <span className="text-sm font-black text-slate-900">142.8 KM</span>
+                         </div>
+                         <div className="flex justify-between items-baseline">
+                            <span className="text-[10px] font-bold text-slate-400">VARLIK DEĞERİ</span>
+                            <span className="text-sm font-black text-emerald-600">{(selectedAracDetay?.alis_fiyat || 0).toLocaleString()} ₺</span>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+              </CardContent>
+
+              {/* Bottom footer for dialog cards */}
+              <div className="bg-slate-50 p-6 flex items-center justify-between border-t border-slate-100">
+                 <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                       <Calendar className="w-4 h-4 text-slate-400" />
+                       <div>
+                          <p className="text-[8px] font-black text-slate-500 uppercase">Satın Alma</p>
+                          <p className="text-xs font-bold text-slate-800">{selectedAracDetay?.alis_tarihi ? new Date(selectedAracDetay.alis_tarihi).toLocaleDateString() : '-'}</p>
+                       </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <History className="w-4 h-4 text-slate-400" />
+                       <div>
+                          <p className="text-[8px] font-black text-slate-500 uppercase">Sisteme Giriş</p>
+                          <p className="text-xs font-bold text-slate-800">{selectedAracDetay?.olusturulma_tarihi ? new Date(selectedAracDetay.olusturulma_tarihi).toLocaleDateString() : '-'}</p>
+                       </div>
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sistem Senkronize</span>
+                 </div>
+              </div>
+            </Card>
+          </div>
+
+          <DialogFooter className="mt-6">
+            <DialogClose asChild>
+              <Button className="bg-slate-900 text-white hover:bg-black font-bold uppercase tracking-widest text-xs px-10 h-12">Kapat</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -7,6 +7,7 @@ router.get('/', userController.getAllUsers);
 
 // Şoförleri getir (/:kullanici_id'dan ÖNCE tanımlanmalı!)
 router.get('/soforler/all', userController.getAllDrivers);
+router.get('/soforler/:kullanici_id/istatistikler', userController.getSoforIstatistikleri);
 
 // Kullanıcıları şirkete göre getir (/:kullanici_id'dan ÖNCE tanımlanmalı!)
 router.get('/sirket/:sirket_id', userController.getUsersByCompany);

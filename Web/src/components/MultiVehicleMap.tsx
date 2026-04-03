@@ -3,7 +3,8 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { VehiclePosition } from '../hooks/useMultiVehicleTracker';
-import { Clock, Gauge, Wifi, WifiOff } from 'lucide-react';
+import { Clock, Gauge, Wifi, WifiOff, Layers, Globe, Moon, Map as MapIcon, Maximize, Compass, Plus, Minus } from 'lucide-react';
+import { clsx } from 'clsx';
 
 // Leaflet default icon fix
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -66,6 +67,13 @@ const VEHICLE_COLORS = [
   '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
 ];
 
+// Harita katmanları (TILES)
+const TILES: Record<string, string> = {
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  standard: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+};
+
 // Saniyeye çevir
 const timeAgo = (dateStr: string): string => {
   if (!dateStr) return '—';
@@ -74,6 +82,16 @@ const timeAgo = (dateStr: string): string => {
   if (diff < 60) return `${diff}s önce`;
   if (diff < 3600) return `${Math.floor(diff / 60)}dk önce`;
   return `${Math.floor(diff / 3600)}s önce`;
+};
+
+// Harita kontrollerini ayarla (zoom butonu vs için yardımcı)
+const MapControls = ({ onZoomIn, onZoomOut }: { onZoomIn: React.MutableRefObject<() => void>, onZoomOut: React.MutableRefObject<() => void> }) => {
+  const map = useMap();
+  useEffect(() => {
+    onZoomIn.current = () => map.setZoom(map.getZoom() + 1);
+    onZoomOut.current = () => map.setZoom(map.getZoom() - 1);
+  }, [map, onZoomIn, onZoomOut]);
+  return null;
 };
 
 // Tüm araçları haritaya sığdır
@@ -122,21 +140,29 @@ interface MultiVehicleMapProps {
 export const MultiVehicleMap: React.FC<MultiVehicleMapProps> = ({
   positions, trailHistory, errors
 }) => {
+  const [mapMode, setMapMode] = React.useState<'dark' | 'satellite' | 'standard'>('satellite');
+  const [showLayers, setShowLayers] = React.useState(false);
+  
+  const zoomInRef = useRef<() => void>(() => {});
+  const zoomOutRef = useRef<() => void>(() => {});
+
   const allPositions: [number, number][] = Array.from(positions.values()).map(
     v => [v.enlem, v.boylam]
   );
 
   return (
-    <div className="w-full h-full rounded-2xl overflow-hidden" style={{ minHeight: 450 }}>
+    <div className="w-full h-full rounded-2xl overflow-hidden relative group" style={{ minHeight: 450 }}>
       <MapContainer
         center={[39.0, 35.0]}
         zoom={6}
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
       >
+        <MapControls onZoomIn={zoomInRef} onZoomOut={zoomOutRef} />
+        
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://carto.com">CartoDB</a>'
+          url={TILES[mapMode]}
+          attribution={mapMode === 'satellite' ? 'Esri' : '&copy; CartoDB'}
         />
 
         <FitBounds positions={allPositions} />
@@ -208,6 +234,54 @@ export const MultiVehicleMap: React.FC<MultiVehicleMapProps> = ({
           );
         })}
       </MapContainer>
+
+      {/* Harita Kontrolleri — Sağ Üst */}
+      <div className="absolute top-4 right-4 flex flex-col gap-2 z-[500] pointer-events-auto group-hover:opacity-100 opacity-90 transition-opacity">
+        <div className="bg-[#0f172a] rounded-xl shadow-xl border border-white/[0.08] overflow-hidden">
+          <button 
+            onClick={() => setShowLayers(!showLayers)} 
+            className={`p-2.5 hover:bg-white/[0.05] transition-colors flex items-center justify-center ${showLayers ? 'text-blue-400 bg-white/[0.05]' : 'text-slate-400'}`}
+          >
+            <Layers className="w-4.5 h-4.5" />
+          </button>
+        </div>
+        
+        <div className="bg-[#0f172a] rounded-xl shadow-xl border border-white/[0.08] overflow-hidden">
+          <button onClick={() => zoomInRef.current()} className="p-2.5 hover:bg-white/[0.05] transition-colors border-b border-white/[0.05] flex items-center justify-center text-slate-400">
+            <Plus className="w-4.5 h-4.5" />
+          </button>
+          <button onClick={() => zoomOutRef.current()} className="p-2.5 hover:bg-white/[0.05] transition-colors flex items-center justify-center text-slate-400">
+            <Minus className="w-4.5 h-4.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Katman Menüsü — Sağ Üst Yan */}
+      {showLayers && (
+        <div className="absolute top-4 right-16 z-[500] bg-[#0f172a] rounded-xl shadow-2xl border border-white/[0.1] p-2 w-48 pointer-events-auto animate-in fade-in slide-in-from-right-2 duration-200">
+          <div className="text-[10px] font-bold text-slate-500 mb-2 px-2 uppercase tracking-widest">Harita Tipi</div>
+          <div className="space-y-1">
+            {(['dark', 'satellite', 'standard'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => { setMapMode(mode); setShowLayers(false); }}
+                className={clsx(
+                  "w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-between",
+                  mapMode === mode 
+                    ? "bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/20 shadow-sm" 
+                    : "hover:bg-white/[0.05] text-slate-400 border border-transparent"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  {mode === 'dark' ? <Moon className="w-3.5 h-3.5" /> : mode === 'satellite' ? <Globe className="w-3.5 h-3.5" /> : <MapIcon className="w-3.5 h-3.5" />}
+                  {mode === 'dark' ? 'Karanlık Mod' : mode === 'satellite' ? 'Uydu Görüntüsü' : 'Standart'}
+                </div>
+                {mapMode === mode && <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

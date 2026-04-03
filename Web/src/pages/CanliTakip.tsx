@@ -5,8 +5,16 @@ import { MultiVehicleMap } from '../components/MultiVehicleMap';
 import { GeofencingPanel } from '../components/GeofencingPanel';
 import {
   Navigation, Search, CheckSquare, Square, Layers,
-  AlertTriangle, Loader2, Gauge, X, ShieldAlert, Map as MapIcon
+  AlertTriangle, Loader2, Gauge, X, ShieldAlert, Map as MapIcon,
+  Radio, Signal, Activity, Target, Zap, MapPin, Truck
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 const VEHICLE_COLORS = [
   '#3b82f6', '#22c55e', '#f59e0b', '#ef4444',
@@ -84,6 +92,69 @@ export default function CanliTakip() {
   const selectAll = () => setSelectedIds(filtered.map(a => a.arac_id));
   const clearAll = () => { setSelectedIds([]); setTrailHistory(new Map()); };
 
+  // --- GERÇEK GPS ENTEGRASYONU ---
+  const [isGpsActive, setIsGpsActive] = useState(false);
+  const [myPos, setMyPos] = useState<{ lat: number; lng: number; speed: number } | null>(null);
+  const watchId = useRef<number | null>(null);
+
+  const startGpsBroadcast = () => {
+    if (!navigator.geolocation) {
+      toast.error('Tarayıcınız GPS desteği sunmuyor');
+      return;
+    }
+
+    setIsGpsActive(true);
+    toast.success('Canlı GPS Yayını Başlatıldı');
+
+    watchId.current = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const { latitude, longitude, speed } = pos.coords;
+        setMyPos({ lat: latitude, lng: longitude, speed: speed || 0 });
+
+        try {
+           // Backend'e gönder (Örn: ID 1'i güncelliyoruz)
+           await fetch('http://localhost:3000/api/takip/konum/update', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+               arac_id: 1, 
+               enlem: latitude,
+               boylam: longitude,
+               hiz: (speed || 0) * 3.6, 
+               motor_durum: true
+             })
+           });
+           
+           // Eğer seçili değilse tracking modunda otomatik seç
+           if (!selectedIds.includes(1)) {
+              setSelectedIds(prev => [...prev, 1]);
+           }
+        } catch (e) {
+           console.error('GPS update failed');
+        }
+      },
+      (err) => {
+        toast.error('GPS Bağlantı Hatası: ' + err.message);
+        setIsGpsActive(false);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
+
+  const stopGpsBroadcast = () => {
+    if (watchId.current !== null) {
+      navigator.geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
+    setIsGpsActive(false);
+    toast.info('GPS Yayını Durduruldu');
+  };
+
+  useEffect(() => {
+    return () => { if (watchId.current) navigator.geolocation.clearWatch(watchId.current); };
+  }, []);
+  // ---------------------------------
+
   const activeVehicles = Array.from(positions.values());
   const totalSpeed = activeVehicles.reduce((s, v) => s + v.hiz, 0);
   const movingCount = activeVehicles.filter(v => v.hiz > 0).length;
@@ -91,73 +162,85 @@ export default function CanliTakip() {
   return (
     <div className="flex flex-col h-full bg-[#0a0f1a] overflow-hidden" style={{ minHeight: 'calc(100vh - 64px)' }}>
 
-      {/* Üst başlık */}
-      <div className="flex items-center gap-3 px-5 py-3 bg-[#0f172a] border-b border-white/[0.06] shrink-0 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/20">
-            <Navigation className="w-4 h-4 text-white" />
+      {/* --- PREMIUM COMMAND HEADER --- */}
+      <div className="flex items-center gap-6 px-8 py-5 bg-[#0a0f1a]/80 backdrop-blur-3xl border-b border-white/5 relative z-30 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+        <div className="flex items-center gap-4">
+          <div className="relative group cursor-pointer">
+            <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full animate-pulse group-hover:bg-blue-400/30 transition-all" />
+            <div className="relative p-3 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 shadow-lg border border-white/10 ring-4 ring-blue-500/5">
+              <Radio className="w-6 h-6 text-white animate-pulse" />
+            </div>
           </div>
           <div>
-            <h1 className="text-white font-bold text-[15px] leading-none">Canlı Araç Takibi</h1>
-            <p className="text-slate-500 text-[11px] mt-0.5">Gerçek zamanlı filo izleme</p>
+            <h1 className="text-xl font-black text-white tracking-tight uppercase flex items-center gap-2">
+              SKYNET <span className="text-blue-500 text-[10px] tracking-[0.4em] font-black bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 ml-1">TR-01</span>
+            </h1>
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-ping" />
+              <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.3em]">Gerçek Zamanlı Varlık İstihbaratı</p>
+            </div>
           </div>
         </div>
 
-        {/* Sekmeler */}
-        <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1 ml-2">
+        <div className="h-12 w-[1px] bg-gradient-to-b from-transparent via-white/10 to-transparent mx-2" />
+
+        {/* Telemetry Ticker */}
+        <div className="hidden xl:flex flex-1 items-center gap-8 px-6 bg-white/[0.02] border border-white/[0.05] rounded-3xl h-14 overflow-hidden relative group">
+           <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#0a0f1a] to-transparent z-10" />
+           <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#0a0f1a] to-transparent z-10" />
+           <div className="flex items-center gap-12 animate-scroll-text whitespace-nowrap">
+              {activeVehicles.length > 0 ? activeVehicles.map(v => (
+                <div key={v.arac_id} className="flex items-center gap-3">
+                   <span className="text-[10px] font-black text-slate-500 uppercase">{v.plaka}</span>
+                   <span className="text-xs font-mono text-emerald-400 font-bold">{v.hiz} KM/S</span>
+                   <div className="w-1 h-1 rounded-full bg-white/20" />
+                </div>
+              )) : (
+                <div className="flex items-center gap-3">
+                   <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest animate-pulse">Sinyal Bekleniyor...</span>
+                   <Activity className="w-3 h-3 text-blue-500 animate-spin-slow" />
+                </div>
+              )}
+           </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 bg-black/40 border border-white/5 rounded-[22px] p-1.5 shadow-inner">
           <button
             onClick={() => setActiveTab('tracking')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === 'tracking'
-                ? 'bg-blue-500/30 text-blue-300 shadow'
-                : 'text-slate-500 hover:text-slate-300'
-            }`}
+            className={cn(
+              "flex items-center gap-2.5 px-6 py-2.5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all duration-500",
+              activeTab === 'tracking' ? "bg-blue-600 text-white shadow-xl shadow-blue-600/40 translate-y-[-1px]" : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+            )}
           >
-            <MapIcon className="w-3.5 h-3.5" />Çoklu Takip
+            <MapIcon className="w-4 h-4" /> Taktik Harita
           </button>
           <button
             onClick={() => setActiveTab('geofencing')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === 'geofencing'
-                ? 'bg-red-500/30 text-red-300 shadow'
-                : 'text-slate-500 hover:text-slate-300'
-            }`}
+            className={cn(
+              "flex items-center gap-2.5 px-6 py-2.5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all duration-500",
+              activeTab === 'geofencing' ? "bg-red-600 text-white shadow-xl shadow-red-600/40 translate-y-[-1px]" : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+            )}
           >
-            <ShieldAlert className="w-3.5 h-3.5" />Sınır İzleme
+            <ShieldAlert className="w-4 h-4" /> Güvenli Bölge
           </button>
         </div>
 
-        {/* Özet — sadece tracking modunda */}
-        {activeTab === 'tracking' && (
-          <div className="flex items-center gap-3 ml-2 pl-3 border-l border-white/10">
-            <div className="text-center">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider">İzlenen</p>
-              <p className="text-white font-bold text-sm">{selectedIds.length}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Hareket</p>
-              <p className="text-emerald-400 font-bold text-sm">{movingCount}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Ort. Hız</p>
-              <p className="text-blue-400 font-bold text-sm">
-                {activeVehicles.length ? (totalSpeed / activeVehicles.length).toFixed(0) : 0} km/s
-              </p>
-            </div>
-          </div>
-        )}
-
-        {selectedIds.length > 0 && activeTab === 'tracking' && (
-          <div className="ml-auto flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-400 text-xs font-semibold">Canlı</span>
-            </div>
-            <button onClick={clearAll} className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        {/* GPS Power Toggle */}
+        <button
+          onClick={isGpsActive ? stopGpsBroadcast : startGpsBroadcast}
+          className={cn(
+            "flex items-center gap-3 px-6 py-3 rounded-[22px] border transition-all duration-700 relative overflow-hidden group",
+            isGpsActive 
+              ? "bg-emerald-500 border-emerald-400 text-white shadow-[0_0_25px_rgba(16,185,129,0.4)]" 
+              : "bg-white/[0.03] border-white/10 text-slate-400 hover:border-blue-500/50 hover:bg-blue-500/5"
+          )}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:animate-shimmer" />
+          <Zap className={cn("w-4 h-4 relative z-10", isGpsActive ? "fill-white animate-pulse" : "fill-none")} />
+          <span className="text-[10px] font-black uppercase tracking-widest relative z-10">
+            {isGpsActive ? 'Canlı GPS Yayını' : 'GPS Yayını Başlat'}
+          </span>
+        </button>
       </div>
 
       {/* Ana içerik */}
@@ -205,76 +288,76 @@ export default function CanliTakip() {
               const id = arac.arac_id;
               const isTracking = activeTab === 'tracking';
               const isSelected = isTracking ? selectedIds.includes(id) : geoAracId === id;
-              const colorIdx = selectedIds.indexOf(id);
-              const color = colorIdx >= 0 ? VEHICLE_COLORS[colorIdx % VEHICLE_COLORS.length] : '#8b5cf6';
               const vPos = positions.get(id);
               const isPolling = pollingLoading.has(id);
-              const hasError = errors.has(id);
-
-              const handleClick = () => {
-                if (isTracking) {
-                  toggleVehicle(id);
-                } else {
-                  setGeoAracId(id);
-                  setGeoPlaka(arac.plaka);
-                }
-              };
 
               return (
                 <div
                   key={id}
-                  onClick={handleClick}
-                  className={`relative flex items-start gap-3 p-3 rounded-xl cursor-pointer select-none transition-all duration-200 border ${
-                    isSelected ? 'bg-white/[0.06] border-white/[0.12]' : 'bg-transparent border-transparent hover:bg-white/[0.03] hover:border-white/[0.06]'
-                  }`}
+                  onClick={() => isTracking ? toggleVehicle(id) : (setGeoAracId(id), setGeoPlaka(arac.plaka))}
+                  className={cn(
+                    "relative group mx-1 my-1 p-4 rounded-2xl cursor-pointer transition-all duration-500 border overflow-hidden",
+                    isSelected 
+                      ? "bg-blue-600/10 border-blue-500/30 shadow-[inset_0_0_20px_rgba(59,130,246,0.1)] scale-[0.98]" 
+                      : "bg-white/[0.02] border-white/5 hover:bg-white/[0.05] hover:border-white/10"
+                  )}
                 >
-                  <div className="mt-0.5 shrink-0">
-                    {isSelected ? (
-                      <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: color }}>
-                        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                  <div className="flex items-center gap-4 relative z-10">
+                    <div className="relative">
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-500 shadow-lg",
+                        isSelected ? "bg-blue-600 shadow-blue-600/40" : "bg-slate-800/80 shadow-black/20"
+                      )}>
+                         <Truck className={cn("w-6 h-6", isSelected ? "text-white" : "text-slate-400")} />
                       </div>
-                    ) : (
-                      <div className="w-5 h-5 rounded-md bg-white/10 border border-white/20" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-white font-bold text-[13px] truncate">{arac.plaka}</span>
-                      {isPolling && isTracking && <Loader2 className="w-2.5 h-2.5 text-blue-400 animate-spin shrink-0" />}
+                      {isSelected && (
+                         <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-emerald-500 rounded-full border-2 border-[#0f172a] flex items-center justify-center animate-bounce-slow">
+                            <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
+                         </div>
+                      )}
                     </div>
-                    <p className="text-slate-400 text-[11px] truncate mt-0.5">{arac.marka} {arac.model}</p>
-                    {isTracking && (
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        {isSelected && vPos && (
-                          <>
-                            <StatusBadge hiz={vPos.hiz} lastUpdated={vPos.lastUpdated} />
-                            <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
-                              <Gauge className="w-2.5 h-2.5" />{vPos.hiz} km/s
-                            </span>
-                          </>
-                        )}
-                        {isSelected && !vPos && isPolling && <span className="text-[10px] text-blue-400">Alınıyor...</span>}
-                        {isSelected && !vPos && !isPolling && hasError && (
-                          <span className="text-[10px] text-red-400 flex items-center gap-0.5"><AlertTriangle className="w-2.5 h-2.5" />Veri yok</span>
-                        )}
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                         <h4 className={cn("font-black text-sm uppercase tracking-tighter", isSelected ? "text-blue-400" : "text-white")}>{arac.plaka}</h4>
+                         {isPolling && <Loader2 className="w-3 h-3 text-blue-500/50 animate-spin" />}
                       </div>
-                    )}
+                      <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-0.5 truncate">{arac.marka} · {arac.model}</p>
+                    </div>
                   </div>
+
+                  {isTracking && isSelected && vPos && (
+                    <div className="mt-4 pt-3 border-t border-white/5 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
+                      <div className="bg-black/20 p-2 rounded-xl border border-white/5">
+                        <p className="text-[8px] font-black text-slate-500 uppercase">Hız</p>
+                        <p className="text-xs font-mono text-emerald-400 font-bold">{vPos.hiz} <span className="text-[8px] text-slate-600">KM/H</span></p>
+                      </div>
+                      <div className="bg-black/20 p-2 rounded-xl border border-white/5 text-right">
+                        <p className="text-[8px] font-black text-slate-500 uppercase">Durum</p>
+                        <StatusBadge hiz={vPos.hiz} lastUpdated={vPos.lastUpdated} />
+                      </div>
+                    </div>
+                  )}
+
                   {isSelected && (
-                    <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{ background: color }} />
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
                   )}
                 </div>
               );
             })}
           </div>
 
-          <div className="p-3 border-t border-white/[0.06]">
-            <p className="text-slate-600 text-[10px] text-center">
+          <div className="p-4 border-t border-white/[0.06] bg-black/20">
+            <div className="flex items-center justify-between mb-2">
+               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Sinyal Kalitesi</span>
+               <div className="flex gap-0.5">
+                  {[1,2,3,4].map(i => <div key={i} className={cn("w-1 h-3 rounded-full", i <= 3 ? "bg-emerald-500" : "bg-white/10")} />)}
+               </div>
+            </div>
+            <p className="text-slate-600 text-[10px] text-center font-bold">
               {activeTab === 'tracking'
-                ? `${araclar.length} araç · ${selectedIds.length} izleniyor · 4s`
-                : `${araclar.length} araç · sınır seçin`}
+                ? `SİSTEMİ ÇEVRİMİÇİ · ${araclar.length} VARLIK`
+                : `COĞRAFİ SINIR MODU AKTİF`}
             </p>
           </div>
         </div>
@@ -297,20 +380,41 @@ export default function CanliTakip() {
                 </div>
               ) : (
                 <>
-                  <div className="flex gap-2 flex-wrap shrink-0">
-                    {Array.from(positions.values()).map((v, idx) => {
-                      const color = VEHICLE_COLORS[idx % VEHICLE_COLORS.length];
-                      return (
-                        <div key={v.arac_id} className="flex items-center gap-2 bg-[#0f172a] rounded-xl px-3 py-1.5 border border-white/[0.08]">
-                          <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
-                          <span className="text-white text-[12px] font-semibold">{v.plaka}</span>
-                          <span className="text-slate-400 text-[11px]">{v.hiz} km/s</span>
+                  <div className="relative flex-1 rounded-3xl overflow-hidden border border-white/[0.06] shadow-[0_0_50px_rgba(0,0,0,0.5)] min-h-[400px]">
+                     {/* Floating Telemetry Box */}
+                     <div className="absolute top-6 left-6 z-[40] pointer-events-none space-y-3">
+                        <div className="bg-[#0f172a]/90 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl animate-in slide-in-from-left-4 duration-500">
+                           <div className="flex items-center gap-3 mb-3">
+                              <Target className="w-4 h-4 text-blue-500 animate-spin-slow" />
+                              <span className="text-[10px] font-black text-white uppercase tracking-widest">Telemetri Verisi</span>
+                           </div>
+                           <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                 <p className="text-[8px] font-black text-slate-500 uppercase">Enlem</p>
+                                 <p className="text-xs font-mono text-blue-400 font-bold">{myPos?.lat.toFixed(6) || '---'}</p>
+                              </div>
+                              <div>
+                                 <p className="text-[8px] font-black text-slate-500 uppercase">Boylam</p>
+                                 <p className="text-xs font-mono text-blue-400 font-bold">{myPos?.lng.toFixed(6) || '---'}</p>
+                              </div>
+                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex-1 rounded-2xl overflow-hidden border border-white/[0.06] shadow-2xl min-h-[400px]">
-                    <MultiVehicleMap positions={positions} trailHistory={trailHistory} errors={errors} />
+
+                        {activeVehicles.length > 0 && (
+                          <div className="bg-black/80 backdrop-blur-md border border-emerald-500/20 p-4 rounded-2xl shadow-2xl animate-in slide-in-from-left-8 duration-700">
+                             <div className="flex items-center gap-3 mb-2">
+                                <Zap className="w-3.5 h-3.5 text-emerald-500" />
+                                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Canlı Akış</span>
+                             </div>
+                             <div className="flex items-baseline gap-1">
+                                <span className="text-2xl font-black text-white tracking-tighter">{activeVehicles[0].hiz}</span>
+                                <span className="text-[10px] font-bold text-slate-500">KM/S</span>
+                             </div>
+                          </div>
+                        )}
+                     </div>
+
+                     <MultiVehicleMap positions={positions} trailHistory={trailHistory} errors={errors} />
                   </div>
                 </>
               )}

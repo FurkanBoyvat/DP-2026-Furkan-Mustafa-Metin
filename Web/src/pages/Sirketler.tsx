@@ -8,8 +8,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Plus, Edit2, Trash2, Search, Building2, AlertCircle, Info, MapPin, Phone, Mail, Globe } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Building2, AlertCircle, Info, MapPin, Phone, Mail, Globe, Car } from 'lucide-react';
 import { toast } from 'sonner';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface Sirket {
   sirket_id: number;
@@ -40,6 +46,7 @@ interface SirketDetay {
 export default function SirketlerPage() {
   const [sirketler, setSirketler] = useState<Sirket[]>([]);
   const [sirketDetaylari, setSirketDetaylari] = useState<Record<number, SirketDetay>>({});
+  const [sirketIstatistikleri, setSirketIstatistikleri] = useState<Record<number, any>>({});
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -155,8 +162,22 @@ export default function SirketlerPage() {
     setIsDialogOpen(true);
   };
 
-  const handleShowDetay = (sirket: Sirket) => {
+  const handleShowDetay = async (sirket: Sirket) => {
     setSelectedSirket(sirket);
+    
+    // Fetch individual company details with stats
+    try {
+      const res = await sirketAPI.getById(sirket.sirket_id);
+      if (res.success) {
+        setSirketIstatistikleri(prev => ({ ...prev, [sirket.sirket_id]: res.istatistikler }));
+        if (res.detaylar) {
+           setSirketDetaylari(prev => ({ ...prev, [sirket.sirket_id]: res.detaylar }));
+        }
+      }
+    } catch (error) {
+      console.error('Detaylar yüklenemedi');
+    }
+
     const detay = sirketDetaylari[sirket.sirket_id];
     if (detay) {
       setDetayFormData({
@@ -409,34 +430,117 @@ export default function SirketlerPage() {
               <TabsTrigger value="detay">Detaylı Bilgiler</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="temel" className="space-y-4">
+            <TabsContent value="temel" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
               {selectedSirket && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-                  <Card className="bg-gray-50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600">Vergi Numarası</p>
-                      <p className="text-lg font-semibold">{selectedSirket.vergi_no}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gray-50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600">Telefon</p>
-                      <p className="text-lg font-semibold">{selectedSirket.telefon}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gray-50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600">Email</p>
-                      <p className="text-lg font-semibold">{selectedSirket.email}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-gray-50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-gray-600">Web Sitesi</p>
-                      <p className="text-lg font-semibold">{selectedSirket.web_sitesi || '-'}</p>
-                    </CardContent>
-                  </Card>
-                </div>
+                <>
+                  <div className="flex items-center justify-between px-1 py-1">
+                     <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-tight">Şirket Kimliği</span>
+                        <h2 className="text-xl font-black text-slate-900 tracking-tight">{selectedSirket.sirket_adi}</h2>
+                     </div>
+                     <Badge className={cn("px-4 py-1.5 rounded-full font-black text-xs uppercase tracking-tighter shadow-sm border-0", selectedSirket.durum ? "bg-emerald-500/90 text-white" : "bg-slate-400 text-white")}>
+                        {selectedSirket.durum ? 'Yayında / Aktif' : 'Pasif Durumda'}
+                     </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Card className="relative overflow-hidden group border-0 bg-gradient-to-br from-red-500 to-red-600 shadow-xl shadow-red-500/20">
+                      <div className="absolute top-0 right-0 p-1 opacity-10 group-hover:scale-150 transition-transform duration-700">
+                        <Building2 className="w-24 h-24 text-white" />
+                      </div>
+                      <CardContent className="p-5 flex flex-col justify-between h-full relative z-10">
+                        <div className="bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center mb-3 backdrop-blur-md border border-white/30">
+                           <Building2 className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">Toplam Filo Gücü</p>
+                          <div className="flex items-baseline gap-1">
+                             <h4 className="text-4xl font-black text-white tracking-tighter">{sirketIstatistikleri[selectedSirket.sirket_id]?.filo_sayisi || 0}</h4>
+                             <span className="text-xs font-bold text-white/60">FİLO</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="relative overflow-hidden group border-0 bg-gradient-to-br from-blue-500 to-blue-600 shadow-xl shadow-blue-500/20">
+                      <div className="absolute top-0 right-0 p-1 opacity-10 group-hover:scale-150 transition-transform duration-700">
+                        <Car className="w-24 h-24 text-white" />
+                      </div>
+                      <CardContent className="p-5 flex flex-col justify-between h-full relative z-10">
+                        <div className="bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center mb-3 backdrop-blur-md border border-white/30">
+                           <Car className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">Kayıtlı Araç Parkı</p>
+                          <div className="flex items-baseline gap-1">
+                             <h4 className="text-4xl font-black text-white tracking-tighter">{sirketIstatistikleri[selectedSirket.sirket_id]?.arac_sayisi || 0}</h4>
+                             <span className="text-xs font-bold text-white/60">ARAÇ</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="relative overflow-hidden group border-0 bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-xl shadow-emerald-500/20">
+                      <div className="absolute top-0 right-0 p-1 opacity-10 group-hover:scale-150 transition-transform duration-700">
+                        <Plus className="w-24 h-24 text-white" />
+                      </div>
+                      <CardContent className="p-5 flex flex-col justify-between h-full relative z-10">
+                        <div className="bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center mb-3 backdrop-blur-md border border-white/30">
+                           <Plus className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1">Atanmış Yöneticiler</p>
+                          <div className="flex items-baseline gap-1">
+                             <h4 className="text-4xl font-black text-white tracking-tighter">{sirketIstatistikleri[selectedSirket.sirket_id]?.yonetici_sayisi || 0}</h4>
+                             <span className="text-xs font-bold text-white/60">KİŞİ</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="group bg-slate-50/80 p-5 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300">
+                        <div className="flex items-center gap-3 mb-2">
+                           <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <Info className="w-4 h-4" />
+                           </div>
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Vergi Kimlik No</span>
+                        </div>
+                        <p className="text-xl font-black text-slate-900 ml-11">{selectedSirket.vergi_no}</p>
+                    </div>
+
+                    <div className="group bg-slate-50/80 p-5 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300">
+                        <div className="flex items-center gap-3 mb-2">
+                           <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <Phone className="w-4 h-4" />
+                           </div>
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Kurumsal İletişim</span>
+                        </div>
+                        <p className="text-xl font-black text-slate-900 ml-11">{selectedSirket.telefon}</p>
+                    </div>
+
+                    <div className="group bg-slate-50/80 p-5 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300">
+                        <div className="flex items-center gap-3 mb-2">
+                           <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <Mail className="w-4 h-4" />
+                           </div>
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Email Yazışma</span>
+                        </div>
+                        <p className="text-xl font-black text-slate-900 ml-11">{selectedSirket.email}</p>
+                    </div>
+
+                    <div className="group bg-slate-50/80 p-5 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300">
+                        <div className="flex items-center gap-3 mb-2">
+                           <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                              <Globe className="w-4 h-4" />
+                           </div>
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Web Portal</span>
+                        </div>
+                        <p className="text-xl font-black text-slate-900 ml-11 break-all">{selectedSirket.web_sitesi || '-'}</p>
+                    </div>
+                  </div>
+                </>
               )}
             </TabsContent>
             

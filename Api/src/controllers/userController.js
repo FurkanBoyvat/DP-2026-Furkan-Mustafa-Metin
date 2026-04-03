@@ -321,6 +321,32 @@ const getAllDrivers = async (req, res) => {
   }
 };
 
+// Şoför istatistiklerini getir
+const getSoforIstatistikleri = async (req, res) => {
+  try {
+    const { kullanici_id } = req.params;
+
+    const statsResult = await pool.query(`
+      SELECT 
+        (SELECT COUNT(DISTINCT arac_id) FROM arac_soforleri WHERE kullanici_id = $1) as toplam_arac_parki,
+        (SELECT a.plaka FROM arac_soforleri aso JOIN araclar a ON aso.arac_id = a.arac_id WHERE aso.kullanici_id = $1 AND (aso.bitis_tarihi IS NULL OR aso.bitis_tarihi > CURRENT_TIMESTAMP) LIMIT 1) as aktif_arac_plaka,
+        (SELECT SUM(a.mevcut_km) FROM arac_soforleri aso JOIN araclar a ON aso.arac_id = a.arac_id WHERE aso.kullanici_id = $1) as toplam_kat_edilen_yol
+    `, [kullanici_id]);
+
+    res.status(200).json({
+      success: true,
+      istatistikler: statsResult.rows[0]
+    });
+  } catch (error) {
+    console.error('Şoför İstatistik Hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUserById,
@@ -329,5 +355,6 @@ module.exports = {
   deleteUser,
   updateUserRole,
   getUsersByCompany,
-  getAllDrivers
+  getAllDrivers,
+  getSoforIstatistikleri
 };

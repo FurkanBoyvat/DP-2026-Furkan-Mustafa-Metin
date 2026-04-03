@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, GeoJSON, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import {
   ShieldAlert, ShieldCheck, MapPin, Loader2,
-  AlertTriangle, CheckCircle2, Search, History, X, Map as MapIcon
+  AlertTriangle, CheckCircle2, Search, History, X, Map as MapIcon, Globe, Moon, Layers, Plus, Minus
 } from 'lucide-react';
+import { clsx } from 'clsx';
 import { useLocationTracking } from '../hooks/useLocationTracking';
 import { useGeofencing, fetchCityGeoJSON, TURKIYE_SEHIRLERI, GeofenceViolation } from '../hooks/useGeofencing';
 
@@ -53,10 +54,27 @@ const geoJsonStyle = (violation: boolean) => ({
   dashArray: '6 4',
 });
 
+// Harita katmanları (TILES)
+const TILES: Record<string, string> = {
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  standard: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+};
+
 // Zaman formatlama
 const formatTime = (s: string) => new Date(s).toLocaleString('tr-TR', {
   day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
 });
+
+// Harita kontrollerini ayarla
+const MapControls = ({ onZoomIn, onZoomOut }: { onZoomIn: React.MutableRefObject<() => void>, onZoomOut: React.MutableRefObject<() => void> }) => {
+  const map = useMap();
+  useEffect(() => {
+    onZoomIn.current = () => map.setZoom(map.getZoom() + 1);
+    onZoomOut.current = () => map.setZoom(map.getZoom() - 1);
+  }, [map, onZoomIn, onZoomOut]);
+  return null;
+};
 
 interface GeofencingPanelProps {
   aracId: number | null;
@@ -69,6 +87,11 @@ export const GeofencingPanel: React.FC<GeofencingPanelProps> = ({ aracId, plaka 
   const [geojsonFeature, setGeojsonFeature] = useState<any>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [mapMode, setMapMode] = useState<'dark' | 'satellite' | 'standard'>('satellite');
+  const [showLayers, setShowLayers] = useState(false);
+  
+  const zoomInRef = useRef<() => void>(() => {});
+  const zoomOutRef = useRef<() => void>(() => {});
 
   const { location, isTracking, setIsTracking } = useLocationTracking();
 
@@ -256,8 +279,7 @@ export const GeofencingPanel: React.FC<GeofencingPanelProps> = ({ aracId, plaka 
         </div>
       )}
 
-      {/* Harita */}
-      <div className={`flex-1 rounded-2xl overflow-hidden shadow-2xl border min-h-[400px] relative z-0 transition-all duration-500
+      <div className={`flex-1 rounded-2xl overflow-hidden shadow-2xl border min-h-[400px] relative group transition-all duration-500
         ${isViolation ? 'border-red-500/50 shadow-red-900/30' : 'border-white/[0.07]'}`
       }>
         <MapContainer
@@ -266,9 +288,11 @@ export const GeofencingPanel: React.FC<GeofencingPanelProps> = ({ aracId, plaka 
           style={{ height: '100%', width: '100%' }}
           zoomControl={false}
         >
+          <MapControls onZoomIn={zoomInRef} onZoomOut={zoomOutRef} />
+          
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; CartoDB'
+            url={TILES[mapMode]}
+            attribution={mapMode === 'satellite' ? 'Esri' : '&copy; CartoDB'}
           />
 
           {isTracking && location.latitude && location.longitude && (
@@ -301,6 +325,54 @@ export const GeofencingPanel: React.FC<GeofencingPanelProps> = ({ aracId, plaka 
             </Marker>
           )}
         </MapContainer>
+
+        {/* Harita Kontrolleri — Sağ Üst */}
+        <div className="absolute top-4 right-4 flex flex-col gap-2 z-[500] pointer-events-auto group-hover:opacity-100 opacity-90 transition-opacity">
+          <div className="bg-[#0f172a] rounded-xl shadow-xl border border-white/[0.08] overflow-hidden">
+            <button 
+              onClick={() => setShowLayers(!showLayers)} 
+              className={`p-2.5 hover:bg-white/[0.05] transition-colors flex items-center justify-center ${showLayers ? 'text-blue-400 bg-white/[0.05]' : 'text-slate-400'}`}
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+          </div>
+          
+          <div className="bg-[#0f172a] rounded-xl shadow-xl border border-white/[0.08] overflow-hidden">
+            <button onClick={() => zoomInRef.current()} className="p-2.5 hover:bg-white/[0.05] transition-colors border-b border-white/[0.05] flex items-center justify-center text-slate-400">
+              <Plus className="w-4 h-4" />
+            </button>
+            <button onClick={() => zoomOutRef.current()} className="p-2.5 hover:bg-white/[0.05] transition-colors flex items-center justify-center text-slate-400">
+              <Minus className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Katman Menüsü — Sağ Üst Yan */}
+        {showLayers && (
+          <div className="absolute top-4 right-16 z-[500] bg-[#0f172a] rounded-xl shadow-2xl border border-white/[0.1] p-2 w-48 pointer-events-auto animate-in fade-in slide-in-from-right-2 duration-200">
+            <div className="text-[10px] font-bold text-slate-500 mb-2 px-2 uppercase tracking-widest">Harita Tipi</div>
+            <div className="space-y-1">
+              {(['dark', 'satellite', 'standard'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => { setMapMode(mode); setShowLayers(false); }}
+                  className={clsx(
+                    "w-full text-left px-3 py-2 rounded-lg text-xs transition-all flex items-center justify-between",
+                    mapMode === mode 
+                      ? "bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/20 shadow-sm" 
+                      : "hover:bg-white/[0.05] text-slate-400 border border-transparent"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    {mode === 'dark' ? <Moon className="w-3.5 h-3.5" /> : mode === 'satellite' ? <Globe className="w-3.5 h-3.5" /> : <MapIcon className="w-3.5 h-3.5" />}
+                    {mode === 'dark' ? 'Karanlık Mod' : mode === 'satellite' ? 'Uydu Görüntüsü' : 'Standart'}
+                  </div>
+                  {mapMode === mode && <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

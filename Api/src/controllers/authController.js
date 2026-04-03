@@ -172,18 +172,83 @@ exports.profil = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'arac_takip_sistemi_gizli_anahtar_2026_jwt_secret_key_cok_guvenli');
     const kullanici_id = decoded.kullanici_id;
 
-    const result = await pool.query(
+    // Kullanıcı bilgilerini al
+    const userResult = await pool.query(
       'SELECT kullanici_id, email, ad, soyad, telefon, rol, durum, olusturulma_tarihi, son_giris_tarih FROM kullanicilar WHERE kullanici_id = $1',
       [kullanici_id]
     );
 
-    if (result.rows.length === 0) {
+    if (userResult.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı', code: 'USER_NOT_FOUND' });
+    }
+
+    const kullanici = userResult.rows[0];
+    let sirket = null;
+
+    // Şirket bilgilerini bul (Yönetici mi?)
+    const yoneticiSirket = await pool.query(
+      `SELECT s.*, sd.* 
+       FROM sirket_yoneticileri sy
+       JOIN sirketler s ON sy.sirket_id = s.sirket_id
+       LEFT JOIN sirket_detaylari sd ON s.sirket_id = sd.sirket_id
+       WHERE sy.kullanici_id = $1`,
+      [kullanici_id]
+    );
+
+    if (yoneticiSirket.rows.length > 0) {
+      sirket = yoneticiSirket.rows[0];
+    } else {
+      // Şoför mü?
+      const soforSirket = await pool.query(
+        `SELECT s.*, sd.* 
+         FROM arac_soforleri asf
+         JOIN araclar a ON asf.arac_id = a.arac_id
+         JOIN sirketler s ON a.sirket_id = s.sirket_id
+         LEFT JOIN sirket_detaylari sd ON s.sirket_id = sd.sirket_id
+         WHERE asf.kullanici_id = $1`,
+        [kullanici_id]
+      );
+      if (soforSirket.rows.length > 0) {
+        sirket = soforSirket.rows[0];
+      }
+    }
+
+    let istatistikler = null;
+    if (sirket) {
+      const filoSayisiResult = await pool.query('SELECT COUNT(*) FROM filolar WHERE sirket_id = $1', [sirket.sirket_id]);
+      const aracSayisiResult = await pool.query('SELECT COUNT(*) FROM araclar WHERE sirket_id = $1', [sirket.sirket_id]);
+      
+      istatistikler = {
+        filoSayisi: parseInt(filoSayisiResult.rows[0].count),
+        aracSayisi: parseInt(aracSayisiResult.rows[0].count)
+      };
     }
 
     return res.status(200).json({
       success: true,
-      kullanici: result.rows[0]
+      kullanici,
+      sirket: sirket ? {
+        sirket_id: sirket.sirket_id,
+        sirket_adi: sirket.sirket_adi,
+        vergi_no: sirket.vergi_no,
+        telefon: sirket.telefon,
+        email: sirket.email,
+        web_sitesi: sirket.web_sitesi,
+        istatistikler,
+        detay: {
+          musteri_hizmetler_telefon: sirket.musteri_hizmetler_telefon,
+          merkez_adres: sirket.merkez_adres,
+          merkez_il: sirket.merkez_il,
+          merkez_ilce: sirket.merkez_ilce,
+          merkez_posta_kodu: sirket.merkez_posta_kodu,
+          kulucu_ad: sirket.kulucu_ad,
+          kulucu_soyad: sirket.kulucu_soyad,
+          kulucu_unvan: sirket.kulucu_unvan,
+          muhasebe_email: sirket.muhasebe_email,
+          muhasebe_telefon: sirket.muhasebe_telefon,
+          logo_url: sirket.logo_url
+        }
+      } : null
     });
   } catch (error) {
     console.error('Profil Hatası:', error);

@@ -88,7 +88,8 @@ exports.createArac = async (req, res) => {
       filo_id, sirket_id, plaka, marka, model, yil, renk, arac_tipi,
       vin_no, motor_no, sarj_no, kapasite_kg, kapasite_m3, yakit_tipi,
       ortalama_yakit_tuketimi, sigorta_numarasi, sigorta_baslangic_tarihi,
-      sigorta_bitis_tarihi, teknik_muayene_tarihi, son_bakım_tarihi
+      sigorta_bitis_tarihi, teknik_muayene_tarihi, son_bakım_tarihi,
+      alis_km, alis_fiyat, alis_tarihi
     } = req.body;
 
     if (!filo_id || !sirket_id || !plaka || !marka || !model || !yil) {
@@ -104,14 +105,16 @@ exports.createArac = async (req, res) => {
         filo_id, sirket_id, plaka, marka, model, yil, renk, arac_tipi,
         vin_no, motor_no, sarj_no, kapasite_kg, kapasite_m3, yakit_tipi,
         ortalama_yakit_tuketimi, sigorta_numarasi, sigorta_baslangic_tarihi,
-        sigorta_bitis_tarihi, teknik_muayene_tarihi, son_bakım_tarihi
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        sigorta_bitis_tarihi, teknik_muayene_tarihi, son_bakım_tarihi,
+        alis_km, alis_fiyat, alis_tarihi, mevcut_km
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
        RETURNING *`,
       [
         filo_id, sirket_id, plaka, marka, model, yil, renk, arac_tipi,
         vin_no, motor_no, sarj_no, kapasite_kg, kapasite_m3, yakit_tipi,
         ortalama_yakit_tuketimi, sigorta_numarasi, sigorta_baslangic_tarihi,
-        sigorta_bitis_tarihi, teknik_muayene_tarihi, son_bakım_tarihi
+        sigorta_bitis_tarihi, teknik_muayene_tarihi, son_bakım_tarihi,
+        alis_km || 0, alis_fiyat || 0, alis_tarihi, alis_km || 0
       ]
     );
 
