@@ -1,10 +1,18 @@
 import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, Circle, Tooltip, Polygon } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { VehiclePosition } from '../hooks/useMultiVehicleTracker';
-import { Clock, Gauge, Wifi, WifiOff, Layers, Globe, Moon, Map as MapIcon, Maximize, Compass, Plus, Minus } from 'lucide-react';
+import { Clock, Gauge, Wifi, WifiOff, Layers, Globe, Moon, Map as MapIcon, Plus, Minus, Navigation, Search, MapPin, ArrowRight, Ban } from 'lucide-react';
 import { clsx } from 'clsx';
+
+// Kısıtlı alan tipi renkleri
+const ZONE_COLORS: Record<string, { stroke: string; fill: string }> = {
+  'yasaklı_alan': { stroke: '#ef4444', fill: 'rgba(239, 68, 68, 0.2)' },
+  'düşük_hız_bölgesi': { stroke: '#f59e0b', fill: 'rgba(245, 158, 11, 0.2)' },
+  'yüksek_hız_bölgesi': { stroke: '#3b82f6', fill: 'rgba(59, 130, 246, 0.2)' },
+  'tehlikeli_bölge': { stroke: '#f97316', fill: 'rgba(249, 115, 22, 0.2)' },
+};
 
 // Leaflet default icon fix
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -85,12 +93,15 @@ const timeAgo = (dateStr: string): string => {
 };
 
 // Harita kontrollerini ayarla (zoom butonu vs için yardımcı)
-const MapControls = ({ onZoomIn, onZoomOut }: { onZoomIn: React.MutableRefObject<() => void>, onZoomOut: React.MutableRefObject<() => void> }) => {
+const MapControls = ({ onZoomIn, onZoomOut, onFlyTo }: { onZoomIn: React.MutableRefObject<() => void>, onZoomOut: React.MutableRefObject<() => void>, onFlyTo: React.MutableRefObject<(lat: number, lon: number) => void> }) => {
   const map = useMap();
   useEffect(() => {
     onZoomIn.current = () => map.setZoom(map.getZoom() + 1);
     onZoomOut.current = () => map.setZoom(map.getZoom() - 1);
-  }, [map, onZoomIn, onZoomOut]);
+    onFlyTo.current = (lat: number, lon: number) => {
+      map.flyTo([lat, lon], 15, { duration: 1.5 });
+    };
+  }, [map, onZoomIn, onZoomOut, onFlyTo]);
   return null;
 };
 
@@ -131,24 +142,73 @@ const AnimatedMarker = ({
   );
 };
 
+interface KisitliAlan {
+  alan_id: number;
+  alan_adi: string;
+  alan_tipi: string;
+  aciklama?: string;
+  merkez_enlem: number;
+  merkez_boylam: number;
+  yaricap_metre: number;
+  max_hiz_kmh?: number;
+  durum: boolean;
+  geometri_tipi?: string; // 'daire' | 'poligon'
+  koordinatlar?: [number, number][]; // Poligon için koordinat dizisi
+}
+
 interface MultiVehicleMapProps {
   positions: Map<number, VehiclePosition>;
   trailHistory: Map<number, [number, number][]>;
   errors: Map<number, string>;
+  kisitliAlanlar?: KisitliAlan[];
 }
 
 export const MultiVehicleMap: React.FC<MultiVehicleMapProps> = ({
-  positions, trailHistory, errors
+  positions, trailHistory, errors, kisitliAlanlar = []
 }) => {
   const [mapMode, setMapMode] = React.useState<'dark' | 'satellite' | 'standard'>('satellite');
   const [showLayers, setShowLayers] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [isSearching, setIsSearching] = React.useState(false);
+  const [searchResult, setSearchResult] = React.useState<{lat: number, lon: number, display_name: string} | null>(null);
   
   const zoomInRef = useRef<() => void>(() => {});
   const zoomOutRef = useRef<() => void>(() => {});
+  const mapFlyToRef = useRef<(lat: number, lon: number) => void>(() => {});
 
   const allPositions: [number, number][] = Array.from(positions.values()).map(
     v => [v.enlem, v.boylam]
   );
+
+  // Adres arama fonksiyonu
+  const handleSearch = async () => {
+    if (!searchQuery || searchQuery.trim().length < 3) return;
+    
+    setIsSearching(true);
+    try {
+      const response = await fetch(`http://localhost:3000/api/kisitli-alanlar/geocode/search?q=${encodeURIComponent(searchQuery)}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setSearchResult(result.data);
+        // Haritaya git
+        mapFlyToRef.current(result.data.lat, result.data.lon);
+      } else {
+        alert('Adres bulunamadı. Lütfen daha açık bir adres girin.');
+      }
+    } catch (error) {
+      console.error('Adres arama hatası:', error);
+      alert('Adres arama sırasında bir hata oluştu.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   return (
     <div className="w-full h-full rounded-2xl overflow-hidden relative group" style={{ minHeight: 450 }}>
@@ -158,7 +218,7 @@ export const MultiVehicleMap: React.FC<MultiVehicleMapProps> = ({
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
       >
-        <MapControls onZoomIn={zoomInRef} onZoomOut={zoomOutRef} />
+        <MapControls onZoomIn={zoomInRef} onZoomOut={zoomOutRef} onFlyTo={mapFlyToRef} />
         
         <TileLayer
           url={TILES[mapMode]}
@@ -233,7 +293,168 @@ export const MultiVehicleMap: React.FC<MultiVehicleMapProps> = ({
             </React.Fragment>
           );
         })}
+
+        {/* Kısıtlı Alanlar (Yasaklı Bölgeler) */}
+        {(() => {
+          console.log('=== KISITLI ALANLAR DEBUG ===');
+          console.log('Toplam alan sayısı:', kisitliAlanlar.length);
+          kisitliAlanlar.forEach((alan, i) => {
+            console.log(`Alan ${i}:`, {
+              id: alan.alan_id,
+              adi: alan.alan_adi,
+              tipi: alan.geometri_tipi,
+              enlem: alan.merkez_enlem,
+              boylam: alan.merkez_boylam,
+              yaricap: alan.yaricap_metre,
+              koordinatSayisi: alan.koordinatlar?.length || 0,
+              koordinatlarVarmi: !!alan.koordinatlar,
+              koordinatlarTipi: alan.koordinatlar ? typeof alan.koordinatlar : 'yok',
+              durum: alan.durum
+            });
+          });
+          return null;
+        })()}
+        {kisitliAlanlar
+          .filter(alan => {
+            // Geçerli koordinat kontrolü
+            const validCoords = alan.merkez_enlem != null && 
+                               alan.merkez_boylam != null &&
+                               !isNaN(alan.merkez_enlem) && 
+                               !isNaN(alan.merkez_boylam) &&
+                               alan.merkez_enlem !== 0 && 
+                               alan.merkez_boylam !== 0;
+            return alan.durum && validCoords;
+          })
+          .map((alan) => {
+          // Parse koordinatlar if string
+          let koordinatlar: [number, number][] | undefined = alan.koordinatlar;
+          if (typeof koordinatlar === 'string') {
+            try {
+              koordinatlar = JSON.parse(koordinatlar);
+            } catch (e) {
+              console.error('Koordinatlar parse hatası:', e);
+              koordinatlar = undefined;
+            }
+          }
+          
+          const colors = ZONE_COLORS[alan.alan_tipi] || ZONE_COLORS['yasaklı_alan'];
+          const isPolygon = alan.geometri_tipi === 'poligon' && koordinatlar && koordinatlar.length > 2;
+          
+          // Tooltip içeriği
+          const tooltipContent = (
+            <Tooltip direction="top" offset={[0, -10]}>
+              <div className="p-2 min-w-[150px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <Ban className="w-4 h-4" style={{ color: colors.stroke }} />
+                  <span className="font-bold text-sm">{alan.alan_adi}</span>
+                </div>
+                <p className="text-xs text-slate-600 mb-1">{alan.aciklama}</p>
+                <div className="text-[10px] text-slate-500">
+                  {isPolygon ? (
+                    <span><span className="font-semibold">Tip:</span> Poligon ({alan.koordinatlar?.length} nokta)</span>
+                  ) : (
+                    <span><span className="font-semibold">Yarıçap:</span> {alan.yaricap_metre}m</span>
+                  )}
+                  {alan.max_hiz_kmh && (
+                    <span className="ml-2">| <span className="font-semibold">Max Hız:</span> {alan.max_hiz_kmh} km/s</span>
+                  )}
+                </div>
+              </div>
+            </Tooltip>
+          );
+          
+          if (isPolygon) {
+            // Poligon gösterimi (hassas sınır)
+            return (
+              <Polygon
+                key={`zone-${alan.alan_id}`}
+                positions={alan.koordinatlar!}
+                pathOptions={{
+                  color: colors.stroke,
+                  fillColor: colors.fill,
+                  fillOpacity: 0.3,
+                  weight: 2,
+                }}
+              >
+                {tooltipContent}
+              </Polygon>
+            );
+          }
+          
+          // Daire gösterimi (varsayılan)
+          const center: [number, number] = [alan.merkez_enlem, alan.merkez_boylam];
+          return (
+            <Circle
+              key={`zone-${alan.alan_id}`}
+              center={center}
+              radius={alan.yaricap_metre || 100}
+              pathOptions={{
+                color: colors.stroke,
+                fillColor: colors.fill,
+                fillOpacity: 0.3,
+                weight: 2,
+                dashArray: '5, 5',
+              }}
+            >
+              {tooltipContent}
+            </Circle>
+          );
+        })}
       </MapContainer>
+
+      {/* Adres Arama — Sol Üst */}
+      <div className="absolute top-4 left-4 z-[500] pointer-events-auto">
+        <div className="bg-[#0f172a]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-white/[0.1] p-2 flex items-center gap-2 min-w-[320px]">
+          <div className="relative flex-1">
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Adres ara... (örn: Kızılay, Ankara)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-3 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            disabled={isSearching || searchQuery.trim().length < 3}
+            className="p-2.5 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white transition-colors"
+            title="Ara"
+          >
+            {isSearching ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Search className="w-4 h-4" />
+            )}
+          </button>
+          <button
+            onClick={() => searchResult && mapFlyToRef.current(searchResult.lat, searchResult.lon)}
+            disabled={!searchResult}
+            className="p-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white transition-colors"
+            title="Adrese Git"
+          >
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+        
+        {/* Arama Sonucu */}
+        {searchResult && (
+          <div className="mt-2 bg-[#0f172a]/95 backdrop-blur-xl rounded-xl shadow-xl border border-white/[0.1] p-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-start gap-2">
+              <Navigation className="w-4 h-4 text-emerald-400 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-slate-300 truncate" title={searchResult.display_name}>
+                  {searchResult.display_name}
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1 font-mono">
+                  {searchResult.lat.toFixed(6)}, {searchResult.lon.toFixed(6)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Harita Kontrolleri — Sağ Üst */}
       <div className="absolute top-4 right-4 flex flex-col gap-2 z-[500] pointer-events-auto group-hover:opacity-100 opacity-90 transition-opacity">

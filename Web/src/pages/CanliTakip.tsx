@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { aracAPI } from '../services/api';
+import { aracAPI, kisitliAlanAPI } from '../services/api';
 import { useMultiVehicleTracker, VehiclePosition } from '../hooks/useMultiVehicleTracker';
 import { MultiVehicleMap } from '../components/MultiVehicleMap';
 import { GeofencingPanel } from '../components/GeofencingPanel';
-import {
-  Navigation, Search, CheckSquare, Square, Layers,
-  AlertTriangle, Loader2, Gauge, X, ShieldAlert, Map as MapIcon,
-  Radio, Signal, Activity, Target, Zap, MapPin, Truck
-} from 'lucide-react';
+import { Search, CheckSquare, Square, Layers, AlertTriangle, Loader2, ShieldAlert, Map as MapIcon, Radio, Activity, Target, Zap, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -49,6 +45,7 @@ export default function CanliTakip() {
   const [activeTab, setActiveTab] = useState<'tracking' | 'geofencing'>('tracking');
   const [geoAracId, setGeoAracId] = useState<number | null>(null);
   const [geoPlaka, setGeoPlaka] = useState<string>('Araç');
+  const [kisitliAlanlar, setKisitliAlanlar] = useState<any[]>([]);
   const prevPositions = useRef<Map<number, VehiclePosition>>(new Map());
 
   const { positions, loading: pollingLoading, errors } = useMultiVehicleTracker(selectedIds);
@@ -58,6 +55,16 @@ export default function CanliTakip() {
       setAraclar(res.data || res.araclar || []);
       setLoading(false);
     });
+
+    // Kısıtlı alanları yükle
+    kisitliAlanAPI.getAktif().then(res => {
+      console.log('Kısıtlı alanlar API yanıtı:', res);
+      if (res.success && res.data) {
+        console.log('Kısıtlı alanlar veri:', res.data);
+        console.log('İlk alan örneği:', res.data[0]);
+        setKisitliAlanlar(res.data);
+      }
+    }).catch(err => console.error('Kısıtlı alanlar yüklenirken hata:', err));
   }, []);
 
   useEffect(() => {
@@ -414,7 +421,7 @@ export default function CanliTakip() {
                         )}
                      </div>
 
-                     <MultiVehicleMap positions={positions} trailHistory={trailHistory} errors={errors} />
+                     <MultiVehicleMap positions={positions} trailHistory={trailHistory} errors={errors} kisitliAlanlar={kisitliAlanlar} />
                   </div>
                 </>
               )}

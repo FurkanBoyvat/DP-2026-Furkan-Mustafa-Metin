@@ -3,12 +3,16 @@ const pool = require('../config/database');
 // Tüm bakım taleplerini listele
 const getAllBakimTalepleri = async (req, res) => {
   try {
+    console.log('getAllBakimTalepleri - Starting query...');
+    
     const result = await pool.query(
       `SELECT bt.*, a.plaka, a.marka, a.model
        FROM bakim_talepleri bt
        LEFT JOIN araclar a ON bt.arac_id = a.arac_id
        ORDER BY bt.talek_tarihi DESC`
     );
+    
+    console.log('getAllBakimTalepleri - Query success, rows:', result.rows.length);
     
     res.status(200).json({
       success: true,
@@ -63,13 +67,23 @@ const getBakimTalebiById = async (req, res) => {
 // Bakım talebi oluştur
 const createBakimTalebi = async (req, res) => {
   try {
-    const { arac_id, bakim_tipi, aciklama, oncelik } = req.body;
+    const { arac_id, bakim_tipi, aciklama, durum } = req.body;
     
+    console.log('createBakimTalebi - Request body:', req.body);
+    
+    if (!arac_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Araç ID zorunludur'
+      });
+    }
+    
+    // Veritabanı şemasına uygun alanlar: arac_id, bakim_tipi, talek_tarihi, durum, aciklama
     const result = await pool.query(
-      `INSERT INTO bakim_talepleri (arac_id, bakim_tipi, aciklama, oncelik, durum)
-       VALUES ($1, $2, $3, $4, 'beklemede')
+      `INSERT INTO bakim_talepleri (arac_id, bakim_tipi, durum, aciklama)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [arac_id, bakim_tipi, aciklama, oncelik]
+      [arac_id, bakim_tipi || 'rutin_bakim', durum || 'bekleniyor', aciklama || '']
     );
     
     res.status(201).json({
@@ -81,7 +95,7 @@ const createBakimTalebi = async (req, res) => {
     console.error('Bakım talebi oluşturma hatası:', error);
     res.status(500).json({
       success: false,
-      message: 'Bakım talebi oluşturulamadı',
+      message: 'Bakım talebi oluşturulamadı: ' + error.message,
       error: error.message
     });
   }

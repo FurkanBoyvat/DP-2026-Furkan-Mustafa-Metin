@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { StatPanel } from './StatPanel';
 import { MultiVehicleMap } from './MultiVehicleMap';
 import { ChartsPanel } from './ChartsPanel';
-import { aracAPI } from '../services/api';
+import { aracAPI, kisitliAlanAPI } from '../services/api';
 import { useMultiVehicleTracker } from '../hooks/useMultiVehicleTracker';
 
 export default function Dashboard() {
   const [allAracIds, setAllAracIds] = useState<number[]>([]);
+  const [kisitliAlanlar, setKisitliAlanlar] = useState<any[]>([]);
   const { positions, errors, loading } = useMultiVehicleTracker(allAracIds);
 
   useEffect(() => {
@@ -20,7 +21,20 @@ export default function Dashboard() {
         console.error('Filo yüklenirken hata:', err);
       }
     };
+
+    const loadKisitliAlanlar = async () => {
+      try {
+        const res = await kisitliAlanAPI.getAktif();
+        if (res.success && res.data) {
+          setKisitliAlanlar(res.data);
+        }
+      } catch (err) {
+        console.error('Kısıtlı alanlar yüklenirken hata:', err);
+      }
+    };
+
     loadAllAracs();
+    loadKisitliAlanlar();
   }, []);
 
   // Aggregated Stats derived from live positions
@@ -52,7 +66,8 @@ export default function Dashboard() {
             <MultiVehicleMap 
               positions={positions} 
               trailHistory={new Map()} 
-              errors={errors} 
+              errors={errors}
+              kisitliAlanlar={kisitliAlanlar}
             />
         </div>
       </div>

@@ -147,6 +147,13 @@ export const kisitliAlanAPI = {
   getAktif: () => fetchWithAuth('/kisitli-alanlar/aktif/all'),
   getById: (alan_id: number) => fetchWithAuth(`/kisitli-alanlar/${alan_id}`),
   create: (data: any) => fetchWithAuth('/kisitli-alanlar', { method: 'POST', body: JSON.stringify(data) }),
+  createFromAddress: (data: { alan_adi: string; aciklama?: string; adres: string; yaricap_metre?: number; max_hiz_kmh?: number; alan_tipi?: string; sirket_id?: number }) => 
+    fetchWithAuth('/kisitli-alanlar/from-address', { method: 'POST', body: JSON.stringify(data) }),
+  // Profesyonel: Sınır/boundary ile poligon oluştur
+  createFromAddressWithBoundary: (data: { alan_adi: string; aciklama?: string; adres: string; max_hiz_kmh?: number; alan_tipi?: string; sirket_id?: number; useBoundary?: boolean }) => 
+    fetchWithAuth('/kisitli-alanlar/from-address/boundary', { method: 'POST', body: JSON.stringify(data) }),
+  geocodeAddress: (query: string) => fetchWithAuth(`/kisitli-alanlar/geocode/search?q=${encodeURIComponent(query)}`),
+  searchAddressMultiple: (query: string, limit = 5) => fetchWithAuth(`/kisitli-alanlar/geocode/search-multiple?q=${encodeURIComponent(query)}&limit=${limit}`),
   update: (alan_id: number, data: any) => fetchWithAuth(`/kisitli-alanlar/${alan_id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (alan_id: number) => fetchWithAuth(`/kisitli-alanlar/${alan_id}`, { method: 'DELETE' }),
 };

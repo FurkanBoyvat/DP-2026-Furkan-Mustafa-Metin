@@ -9,7 +9,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
-import { Plus, Edit2, Trash2, Search, MapPin, AlertCircle, AlertTriangle, Gauge, Ban } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { 
+  Plus, Edit2, Trash2, Search, MapPin, AlertCircle, AlertTriangle, Gauge, Ban,
+  MapPinned, Navigation
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 interface KisitliAlan {
@@ -48,6 +52,14 @@ export default function KisitliAlanlarPage() {
   const [tipFilter, setTipFilter] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAlan, setEditingAlan] = useState<KisitliAlan | null>(null);
+  const [inputMode, setInputMode] = useState<'coordinates' | 'address'>('coordinates');
+  const [addressInput, setAddressInput] = useState('');
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodedCoords, setGeocodedCoords] = useState<{lat: number, lon: number, display_name: string} | null>(null);
+  const [useBoundary, setUseBoundary] = useState(true); // Hassas sınır kullanımı
+  const [autoRadius, setAutoRadius] = useState(true); // Otomatik yarıçap
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   const [formData, setFormData] = useState({
     sirket_id: '',
@@ -72,8 +84,9 @@ export default function KisitliAlanlarPage() {
         kisitliAlanAPI.getAll(),
         sirketAPI.getAll(),
       ]);
-      setAlanlar(alanRes.kisitli_alanlar || []);
-      setSirketler(sirketRes.sirketler || []);
+      console.log('API Response:', alanRes);
+      setAlanlar(alanRes.data || alanRes.kisitli_alanlar || []);
+      setSirketler(sirketRes.data || sirketRes.sirketler || []);
     } catch (error: any) {
       toast.error('Veriler yüklenirken hata oluştu');
     } finally {
@@ -84,22 +97,55 @@ export default function KisitliAlanlarPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const data = {
-        ...formData,
-        sirket_id: parseInt(formData.sirket_id),
-        merkez_enlem: parseFloat(formData.merkez_enlem),
-        merkez_boylam: parseFloat(formData.merkez_boylam),
-        yaricap_metre: parseFloat(formData.yaricap_metre),
-        max_hiz_kmh: formData.max_hiz_kmh ? parseFloat(formData.max_hiz_kmh) : undefined,
-      };
-
-      if (editingAlan) {
-        await kisitliAlanAPI.update(editingAlan.alan_id, data);
-        toast.success('Kısıtlı alan güncellendi');
+      // Adres modunda ve yeni kayıt ise adres API'sini kullan
+      if (inputMode === 'address' && !editingAlan && addressInput.trim()) {
+        // Hassas sınır (poligon) kullanımı
+        if (useBoundary) {
+          const data = {
+            alan_adi: formData.alan_adi,
+            aciklama: formData.aciklama,
+            adres: addressInput,
+            max_hiz_kmh: formData.max_hiz_kmh ? parseFloat(formData.max_hiz_kmh) : undefined,
+            alan_tipi: formData.alan_tipi || 'yasaklı_alan',
+            sirket_id: parseInt(formData.sirket_id),
+            useBoundary: true
+          };
+          await kisitliAlanAPI.createFromAddressWithBoundary(data);
+          toast.success('Kısıtlı alan sınır verisi ile (poligon) oluşturuldu');
+        } else {
+          // Basit daire modu - yarıçap otomatik veya manuel
+          const data = {
+            alan_adi: formData.alan_adi,
+            aciklama: formData.aciklama,
+            adres: addressInput,
+            yaricap_metre: autoRadius ? 0 : parseFloat(formData.yaricap_metre) || 100, // 0 = otomatik
+            max_hiz_kmh: formData.max_hiz_kmh ? parseFloat(formData.max_hiz_kmh) : undefined,
+            alan_tipi: formData.alan_tipi || 'yasaklı_alan',
+            sirket_id: parseInt(formData.sirket_id),
+          };
+          await kisitliAlanAPI.createFromAddress(data);
+          toast.success(`Kısıtlı alan oluşturuldu (${autoRadius ? 'otomatik yarıçap' : formData.yaricap_metre + 'm'})`);
+        }
       } else {
-        await kisitliAlanAPI.create(data);
-        toast.success('Kısıtlı alan oluşturuldu');
+        // Normal koordinat bazlı oluşturma/güncelleme
+        const data = {
+          ...formData,
+          sirket_id: parseInt(formData.sirket_id),
+          merkez_enlem: parseFloat(formData.merkez_enlem),
+          merkez_boylam: parseFloat(formData.merkez_boylam),
+          yaricap_metre: parseFloat(formData.yaricap_metre),
+          max_hiz_kmh: formData.max_hiz_kmh ? parseFloat(formData.max_hiz_kmh) : undefined,
+        };
+
+        if (editingAlan) {
+          await kisitliAlanAPI.update(editingAlan.alan_id, data);
+          toast.success('Kısıtlı alan güncellendi');
+        } else {
+          await kisitliAlanAPI.create(data);
+          toast.success('Kısıtlı alan oluşturuldu');
+        }
       }
+
       setIsDialogOpen(false);
       resetForm();
       loadData();
@@ -147,6 +193,13 @@ export default function KisitliAlanlarPage() {
 
   const resetForm = () => {
     setEditingAlan(null);
+    setInputMode('coordinates');
+    setAddressInput('');
+    setGeocodedCoords(null);
+    setUseBoundary(true);
+    setAutoRadius(true);
+    setAddressSuggestions([]);
+    setShowSuggestions(false);
     setFormData({
       sirket_id: '',
       alan_adi: '',
@@ -158,6 +211,51 @@ export default function KisitliAlanlarPage() {
       max_hiz_kmh: '',
       durum: true,
     });
+  };
+
+  // Adres arama fonksiyonu - birden fazla sonuç getir
+  const searchAddress = async () => {
+    if (!addressInput || addressInput.trim().length < 3) {
+      toast.error('Lütfen en az 3 karakter içeren bir adres girin');
+      return;
+    }
+
+    setIsGeocoding(true);
+    setShowSuggestions(false);
+    try {
+      const result = await kisitliAlanAPI.searchAddressMultiple(addressInput, 5);
+      if (result.success && result.data && result.data.length > 0) {
+        if (result.data.length === 1) {
+          // Tek sonuç varsa direkt seç
+          handleAddressSelect(result.data[0]);
+        } else {
+          // Birden fazla sonuç varsa listele
+          setAddressSuggestions(result.data);
+          setShowSuggestions(true);
+          toast.success(`${result.data.length} adres bulundu, lütfen seçin`);
+        }
+      } else {
+        toast.error('Adres bulunamadı. Lütfen daha açık bir adres deneyin.');
+      }
+    } catch (error: any) {
+      toast.error('Adres arama hatası: ' + (error.message || 'Bilinmeyen hata'));
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  // Adres seçim fonksiyonu
+  const handleAddressSelect = (selected: any) => {
+    setGeocodedCoords(selected);
+    setAddressInput(selected.display_name);
+    setFormData(prev => ({
+      ...prev,
+      merkez_enlem: String(selected.lat),
+      merkez_boylam: String(selected.lon),
+      aciklama: prev.aciklama || selected.display_name
+    }));
+    setShowSuggestions(false);
+    toast.success(`Seçildi: ${selected.display_name.substring(0, 50)}...`);
   };
 
   const getAlanTipiInfo = (tipi: string) => {
@@ -258,38 +356,224 @@ export default function KisitliAlanlarPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="merkez_enlem">Merkez Enlem *</Label>
-                  <Input
-                    id="merkez_enlem"
-                    type="number"
-                    step="0.000001"
-                    value={formData.merkez_enlem}
-                    onChange={(e) => setFormData({ ...formData, merkez_enlem: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="merkez_boylam">Merkez Boylam *</Label>
-                  <Input
-                    id="merkez_boylam"
-                    type="number"
-                    step="0.000001"
-                    value={formData.merkez_boylam}
-                    onChange={(e) => setFormData({ ...formData, merkez_boylam: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="yaricap_metre">Yarıçap (metre) *</Label>
-                  <Input
-                    id="yaricap_metre"
-                    type="number"
-                    value={formData.yaricap_metre}
-                    onChange={(e) => setFormData({ ...formData, yaricap_metre: e.target.value })}
-                    required
-                  />
-                </div>
+                {!editingAlan && (
+                  <div className="space-y-2 sm:col-span-2">
+                    <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as 'coordinates' | 'address')} className="w-full">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="coordinates" className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4" />
+                          Koordinat ile
+                        </TabsTrigger>
+                        <TabsTrigger value="address" className="flex items-center gap-2">
+                          <MapPinned className="w-4 h-4" />
+                          Adres ile
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="coordinates" className="space-y-4 mt-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="merkez_enlem">Merkez Enlem *</Label>
+                            <Input
+                              id="merkez_enlem"
+                              type="number"
+                              step="0.000001"
+                              value={formData.merkez_enlem}
+                              onChange={(e) => setFormData({ ...formData, merkez_enlem: e.target.value })}
+                              placeholder="39.9334"
+                              required={inputMode === 'coordinates'}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="merkez_boylam">Merkez Boylam *</Label>
+                            <Input
+                              id="merkez_boylam"
+                              type="number"
+                              step="0.000001"
+                              value={formData.merkez_boylam}
+                              onChange={(e) => setFormData({ ...formData, merkez_boylam: e.target.value })}
+                              placeholder="32.8597"
+                              required={inputMode === 'coordinates'}
+                            />
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="address" className="space-y-4 mt-4">
+                        <div className="space-y-2 relative">
+                          <Label htmlFor="adres">Adres *</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="adres"
+                              value={addressInput}
+                              onChange={(e) => {
+                                setAddressInput(e.target.value);
+                                if (e.target.value.length < 3) setShowSuggestions(false);
+                              }}
+                              placeholder="Örn: Kayseri Esenyurt Mahallesi veya Çankaya, Ankara"
+                              className="flex-1"
+                              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), searchAddress())}
+                            />
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={searchAddress}
+                              disabled={isGeocoding || addressInput.trim().length < 3}
+                            >
+                              {isGeocoding ? (
+                                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Search className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            Mahalle, semt veya ilçe adı girin ve 🔍 butonuna tıklayın. Birden fazla sonuç varsa listeden seçin.
+                          </p>
+                          
+                          {/* Adres Öneri Listesi */}
+                          {showSuggestions && addressSuggestions.length > 0 && (
+                            <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                              <div className="p-2 bg-slate-50 text-xs font-medium text-slate-500 border-b">
+                                {addressSuggestions.length} sonuç bulundu - Lütfen doğru olanı seçin
+                              </div>
+                              {addressSuggestions.map((suggestion, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => handleAddressSelect(suggestion)}
+                                  className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-100 last:border-0 transition-colors"
+                                >
+                                  <p className="text-sm text-slate-800 truncate">{suggestion.display_name}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {suggestion.type} • {suggestion.lat.toFixed(4)}, {suggestion.lon.toFixed(4)}
+                                  </p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Hassas Sınır Seçeneği */}
+                          <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-md mt-2">
+                            <Switch
+                              checked={useBoundary}
+                              onCheckedChange={setUseBoundary}
+                              id="use-boundary"
+                            />
+                            <div className="flex-1">
+                              <Label htmlFor="use-boundary" className="text-sm font-medium text-blue-900 cursor-pointer">
+                                Hassas Sınır (Poligon) Kullan
+                              </Label>
+                              <p className="text-xs text-blue-700 mt-0.5">
+                                {useBoundary 
+                                  ? 'Mahalle/semt sınırlarını tam olarak kullanır (önerilir)' 
+                                  : 'Sadece merkez nokta ve yarıçap kullanır'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {/* Otomatik Yarıçap Seçeneği - Sadece daire modunda */}
+                          {!useBoundary && (
+                            <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-md mt-2">
+                              <Switch
+                                checked={autoRadius}
+                                onCheckedChange={setAutoRadius}
+                                id="auto-radius"
+                              />
+                              <div className="flex-1">
+                                <Label htmlFor="auto-radius" className="text-sm font-medium text-green-900 cursor-pointer">
+                                  Yarıçabı Otomatik Belirle
+                                </Label>
+                                <p className="text-xs text-green-700 mt-0.5">
+                                  {autoRadius 
+                                    ? 'Adres tipine göre otomatik: Şehir 10km, İlçe 5km, Mahalle 1km' 
+                                    : 'Manuel yarıçap giriniz'}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Manuel Yarıçap Input - Otomatik kapalıysa göster */}
+                          {!useBoundary && !autoRadius && (
+                            <div className="space-y-2 mt-2">
+                              <Label htmlFor="yaricap_adres">Yarıçap (metre)</Label>
+                              <Input
+                                id="yaricap_adres"
+                                type="number"
+                                value={formData.yaricap_metre}
+                                onChange={(e) => setFormData({ ...formData, yaricap_metre: e.target.value })}
+                                placeholder="Örn: 1000"
+                              />
+                            </div>
+                          )}
+                          
+                          {geocodedCoords && (
+                            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                              <p className="text-sm text-green-800 flex items-center gap-2">
+                                <Navigation className="w-4 h-4" />
+                                Adres bulundu:
+                              </p>
+                              <p className="text-xs text-green-700 mt-1 font-mono">
+                                {geocodedCoords.lat.toFixed(6)}, {geocodedCoords.lon.toFixed(6)}
+                              </p>
+                              <p className="text-xs text-slate-600 mt-1 truncate" title={geocodedCoords.display_name}>
+                                {geocodedCoords.display_name}
+                              </p>
+                            </div>
+                          )}
+                          {formData.merkez_enlem && formData.merkez_boylam && !geocodedCoords && (
+                            <div className="p-2 bg-blue-50 border border-blue-200 rounded-md">
+                              <p className="text-xs text-blue-700">
+                                Koordinatlar: {formData.merkez_enlem}, {formData.merkez_boylam}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                )}
+
+                {editingAlan && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="merkez_enlem">Merkez Enlem *</Label>
+                      <Input
+                        id="merkez_enlem"
+                        type="number"
+                        step="0.000001"
+                        value={formData.merkez_enlem}
+                        onChange={(e) => setFormData({ ...formData, merkez_enlem: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="merkez_boylam">Merkez Boylam *</Label>
+                      <Input
+                        id="merkez_boylam"
+                        type="number"
+                        step="0.000001"
+                        value={formData.merkez_boylam}
+                        onChange={(e) => setFormData({ ...formData, merkez_boylam: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Yarıçap sadece koordinat modunda veya düzenlemede göster */}
+                {(inputMode === 'coordinates' || editingAlan) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="yaricap_metre">Yarıçap (metre) *</Label>
+                    <Input
+                      id="yaricap_metre"
+                      type="number"
+                      value={formData.yaricap_metre}
+                      onChange={(e) => setFormData({ ...formData, yaricap_metre: e.target.value })}
+                      required
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="max_hiz_kmh">Max Hız (km/s)</Label>
                   <Input
@@ -432,12 +716,12 @@ export default function KisitliAlanlarPage() {
                           <TableCell>{getSirketAdi(alan.sirket_id)}</TableCell>
                           <TableCell>
                             <div className="text-xs font-mono">
-                              {alan.geometri_tipi === 'cokgen' || alan.geometri_tipi === 'dikdortgen' 
-                                ? 'Özel Çizim' 
-                                : `${alan.merkez_enlem?.toFixed(6)}, ${alan.merkez_boylam?.toFixed(6)}`}
+                              {alan.geometri_tipi === 'cokgen' || alan.geometri_tipi === 'dikdortgen' || alan.geometri_tipi === 'poligon'
+                                ? 'Poligon (Sınır)' 
+                                : `${Number(alan.merkez_enlem)?.toFixed(6)}, ${Number(alan.merkez_boylam)?.toFixed(6)}`}
                             </div>
                           </TableCell>
-                          <TableCell>{alan.geometri_tipi === 'cokgen' || alan.geometri_tipi === 'dikdortgen' ? '-' : `${alan.yaricap_metre} m`}</TableCell>
+                          <TableCell>{alan.geometri_tipi === 'cokgen' || alan.geometri_tipi === 'dikdortgen' || alan.geometri_tipi === 'poligon' ? '-' : `${alan.yaricap_metre} m`}</TableCell>
                           <TableCell>{alan.max_hiz_kmh ? `${alan.max_hiz_kmh} km/s` : '-'}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">

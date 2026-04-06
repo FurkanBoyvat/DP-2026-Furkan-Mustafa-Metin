@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Plus, Edit2, Trash2, Search, Fuel, AlertCircle, 
-  TrendingUp, DollarSign, Trophy, Medal, MapPin, 
+  DollarSign, Trophy, Medal, MapPin, 
   Calendar, User, Building2, Landmark
 } from 'lucide-react';
 import { toast } from 'sonner';

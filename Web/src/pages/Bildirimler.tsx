@@ -1,16 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bell, 
   ShieldAlert, 
   Wrench, 
-  Car, 
-  MapPin, 
-  User,
   Check,
   X,
-  Filter,
   Search,
-  Calendar,
   Clock,
   AlertCircle,
   CheckCircle,
@@ -20,6 +15,8 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { toast } from 'sonner';
+import { bolgeIhlalAPI, bakimAPI, aracAPI } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -35,104 +32,9 @@ interface Notification {
   priority: 'high' | 'medium' | 'low';
   action?: {
     label: string;
-    onClick: () => void;
+    path: string;
   };
 }
-
-const notifications: Notification[] = [
-  {
-    id: '1',
-    type: 'alert',
-    title: 'Acil Bölge İhlali',
-    message: '34 ABC 123 plakalı araç izin verilmeyen bölgeye girdi. İstanbul/Maslak',
-    time: '2 dakika önce',
-    read: false,
-    priority: 'high',
-    action: {
-      label: 'Haritada Göster',
-      onClick: () => toast.info('Harita açılıyor...')
-    }
-  },
-  {
-    id: '2',
-    type: 'maintenance',
-    title: 'Bakım Zamanı Geldi',
-    message: '56 DEF 456 plakalı araç için periyodik bakım zamanı geldi.',
-    time: '15 dakika önce',
-    read: false,
-    priority: 'medium',
-    action: {
-      label: 'Bakım Planla',
-      onClick: () => toast.info('Bakım planlama sayfasına yönlendiriliyorsunuz...')
-    }
-  },
-  {
-    id: '3',
-    type: 'warning',
-    title: 'Yakıt Seviyesi Düşük',
-    message: '78 GHI 789 plakalı aracın yakıt seviyesi %20nin altında.',
-    time: '1 saat önce',
-    read: false,
-    priority: 'medium',
-    action: {
-      label: 'Yakıt İstasyonları',
-      onClick: () => toast.info('Yakıt istasyonları haritası açılıyor...')
-    }
-  },
-  {
-    id: '4',
-    type: 'info',
-    title: 'Yeni Şoför Eklendi',
-    message: 'Ahmet Yılmaz sisteme yeni şoför olarak eklendi.',
-    time: '2 saat önce',
-    read: true,
-    priority: 'low'
-  },
-  {
-    id: '5',
-    type: 'success',
-    title: 'Bakım Tamamlandı',
-    message: '90 JKL 012 plakalı aracın bakımı başarıyla tamamlandı.',
-    time: '3 saat önce',
-    read: true,
-    priority: 'low'
-  },
-  {
-    id: '6',
-    type: 'alert',
-    title: 'Hız İhlali',
-    message: '23 MNO 345 plakalı araç hız limitini aştı (120 km/saat). E-5 Otoyolu',
-    time: '4 saat önce',
-    read: true,
-    priority: 'high',
-    action: {
-      label: 'Detayları Gör',
-      onClick: () => toast.info('İhlal detayları açılıyor...')
-    }
-  },
-  {
-    id: '7',
-    type: 'warning',
-    title: 'Sürücü Yorgunluk Uyarısı',
-    message: 'Ahmet Demir 4 saatten fazla süredir sürüş yapıyor. Mola vermesi öneriliyor.',
-    time: '5 saat önce',
-    read: true,
-    priority: 'medium',
-    action: {
-      label: 'Sürücüye Bildir',
-      onClick: () => toast.success('Sürücüye bildirim gönderildi.')
-    }
-  },
-  {
-    id: '8',
-    type: 'info',
-    title: 'Sistem Bakımı',
-    message: 'Yarın saat 02:00-04:00 arasında sistem bakımı yapılacaktır.',
-    time: '1 gün önce',
-    read: true,
-    priority: 'low'
-  }
-];
 
 const typeIcons = {
   alert: ShieldAlert,
@@ -165,9 +67,108 @@ const priorityColors = {
 };
 
 export default function Bildirimler() {
+  const navigate = useNavigate();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'unread' | 'high'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [notificationsList, setNotificationsList] = useState(notifications);
+  const [notificationsList, setNotificationsList] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // loading state kullanımı
+  useEffect(() => {
+    if (!loading) {
+      toast.success('Bildirimler yüklendi');
+    }
+  }, [loading]);
+
+  // Gerçek verileri çek
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  const loadNotifications = async () => {
+    setLoading(true);
+    try {
+      const [ihlalRes, bakimRes, aracRes] = await Promise.all([
+        bolgeIhlalAPI.getAll().catch(() => ({ data: [] })),
+        bakimAPI.getAll().catch(() => ({ data: [] })),
+        aracAPI.getAll().catch(() => ({ araclar: [] }))
+      ]);
+
+      const ihlaller = ihlalRes.data || [];
+      const bakimlar = (bakimRes.data || []).filter((b: any) => b.durum === 'bekleniyor');
+      const araclar = aracRes.araclar || aracRes.data || [];
+
+      const generatedNotifications: Notification[] = [];
+
+      // Bölge ihlallerinden bildirimler oluştur
+      ihlaller.slice(0, 10).forEach((ihlal: any, idx: number) => {
+        const arac = araclar.find((a: any) => a.arac_id === ihlal.arac_id);
+        generatedNotifications.push({
+          id: `ihlal-${ihlal.ihlal_id || idx}`,
+          type: 'alert',
+          title: 'Bölge İhlali',
+          message: `${arac?.plaka || 'Bilinmeyen plaka'} - ${ihlal.ihlal_tipi || 'Kısıtlı bölgeye giriş'}`,
+          time: ihlal.giris_tarihi ? new Date(ihlal.giris_tarihi).toLocaleString('tr-TR') : 'Bilinmiyor',
+          read: ihlal.cozulme_durumu || false,
+          priority: 'high',
+          action: {
+            label: 'Canlı Takip',
+            path: '/canli-takip'
+          }
+        });
+      });
+
+      // Bekleyen bakım taleplerinden bildirimler oluştur
+      bakimlar.forEach((bakim: any, idx: number) => {
+        const arac = araclar.find((a: any) => a.arac_id === bakim.arac_id);
+        generatedNotifications.push({
+          id: `bakim-${bakim.talek_id || idx}`,
+          type: 'maintenance',
+          title: 'Bekleyen Bakım',
+          message: `${arac?.plaka || 'Araç'} - ${bakim.bakim_tipi || 'Bakım'}`,
+          time: bakim.talek_tarihi ? new Date(bakim.talek_tarihi).toLocaleString('tr-TR') : 'Bilinmiyor',
+          read: false,
+          priority: 'medium',
+          action: {
+            label: 'Bakımlar',
+            path: '/bakim'
+          }
+        });
+      });
+
+      // Yaklaşan sigorta/muayene kontrolü (örnek)
+      const today = new Date();
+      araclar.forEach((arac: any) => {
+        if (arac.sigorta_bitis_tarihi) {
+          const sigortaBitis = new Date(arac.sigorta_bitis_tarihi);
+          const gunFarki = Math.ceil((sigortaBitis.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (gunFarki <= 30 && gunFarki > 0) {
+            generatedNotifications.push({
+              id: `sigorta-${arac.arac_id}`,
+              type: 'warning',
+              title: 'Sigorta Süresi Doluyor',
+              message: `${arac.plaka} - ${gunFarki} gün kaldı`,
+              time: today.toLocaleString('tr-TR'),
+              read: false,
+              priority: gunFarki <= 7 ? 'high' : 'medium',
+              action: {
+                label: 'Araçlar',
+                path: '/araclar'
+              }
+            });
+          }
+        }
+      });
+
+      setNotificationsList(generatedNotifications);
+    } catch (error) {
+      console.error('Bildirimler yüklenirken hata:', error);
+      toast.error('Bildirimler yüklenemedi');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredNotifications = notificationsList.filter(notification => {
     const matchesSearch = notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -416,7 +417,7 @@ export default function Bildirimler() {
                       <div className="flex items-center gap-2 ml-4">
                         {notification.action && (
                           <button
-                            onClick={notification.action.onClick}
+                            onClick={() => navigate(notification.action!.path)}
                             className="px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
                           >
                             {notification.action.label}

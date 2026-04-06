@@ -76,8 +76,8 @@ export default function BakimPage() {
         bakimAPI.getAll(),
         aracAPI.getAll(),
       ]);
-      setBakimTalepleri(bakimRes.bakim_talepleri || []);
-      setAraclar(aracRes.araclar || []);
+      setBakimTalepleri(bakimRes.data || bakimRes.bakim_talepleri || []);
+      setAraclar(aracRes.araclar || aracRes.data || []);
     } catch (error: any) {
       toast.error('Veriler yüklenirken hata oluştu');
     } finally {

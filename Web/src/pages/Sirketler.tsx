@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Plus, Edit2, Trash2, Search, Building2, AlertCircle, Info, MapPin, Phone, Mail, Globe, Car } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Building2, AlertCircle, Info, Phone, Mail, Globe, Car } from 'lucide-react';
 import { toast } from 'sonner';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
