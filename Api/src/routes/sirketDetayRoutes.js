@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const sirketDetayController = require('../controllers/sirketDetayController');
+const { verifyToken, verifySirketYoneticisi } = require('../middleware/authMiddleware');
+
+// Tüm rotalar için token doğrulaması zorunlu
+router.use(verifyToken);
 
 // Tüm şirket detaylarını listele
 router.get('/', sirketDetayController.getAllSirketDetaylari);
@@ -17,13 +21,15 @@ router.get('/aktif/all', sirketDetayController.getAllSirketDetaylari);
 // Tek şirket detayı getir
 router.get('/:detay_id', sirketDetayController.getSirketDetayiById);
 
+// --- Yetki Gerektiren İşlemler ---
+
 // Şirket detayı oluştur
-router.post('/', sirketDetayController.createSirketDetayi);
+router.post('/', verifySirketYoneticisi, sirketDetayController.createSirketDetayi);
 
 // Şirket detayı güncelle
-router.put('/:detay_id', sirketDetayController.updateSirketDetayi);
+router.put('/:detay_id', verifySirketYoneticisi, sirketDetayController.updateSirketDetayi);
 
 // Şirket detayı sil
-router.delete('/:detay_id', sirketDetayController.deleteSirketDetayi);
+router.delete('/:detay_id', verifySirketYoneticisi, sirketDetayController.deleteSirketDetayi);
 
 module.exports = router;

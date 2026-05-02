@@ -1,14 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const yakitController = require('../controllers/yakitController');
+const { verifyToken, verifySirketYoneticisi } = require('../middleware/authMiddleware');
 
-// --- Şoför Bazlı Yakıt Kayıtları (ÖNCE tanımlanmalı!) ---
+// Tüm rotalar için token doğrulaması zorunlu
+router.use(verifyToken);
+
+// --- Şoför Bazlı Yakıt Kayıtları ---
 router.get('/sofor/kayitlar', yakitController.getAllSoforYakitKayitlari);
 router.get('/sofor/leaderboard', yakitController.getSoforLeaderboard);
 router.get('/sofor/leaderboard/arac-tipi', yakitController.getSoforLeaderboardByAracTipi);
 router.post('/sofor/kayitlar', yakitController.createSoforYakitKaydi);
-router.put('/sofor/kayitlar/:kayit_id', yakitController.updateSoforYakitKaydi);
-router.delete('/sofor/kayitlar/:kayit_id', yakitController.deleteSoforYakitKaydi);
+router.put('/sofor/kayitlar/:kayit_id', verifySirketYoneticisi, yakitController.updateSoforYakitKaydi);
+router.delete('/sofor/kayitlar/:kayit_id', verifySirketYoneticisi, yakitController.deleteSoforYakitKaydi);
 
 // Tüm yakıt tüketim kayıtlarını listele
 router.get('/', yakitController.getAllYakitKayitlari);
@@ -28,13 +32,15 @@ router.get('/tarih/aralik', yakitController.getYakitKayitlariByTarihAraligi);
 // Tek yakıt kaydı getir
 router.get('/:kayit_id', yakitController.getYakitKaydiById);
 
+// --- Yetki Gerektiren İşlemler ---
+
 // Yakıt kaydı oluştur
 router.post('/', yakitController.createYakitKaydi);
 
 // Yakıt kaydı güncelle
-router.put('/:kayit_id', yakitController.updateYakitKaydi);
+router.put('/:kayit_id', verifySirketYoneticisi, yakitController.updateYakitKaydi);
 
 // Yakıt kaydı sil
-router.delete('/:kayit_id', yakitController.deleteYakitKaydi);
+router.delete('/:kayit_id', verifySirketYoneticisi, yakitController.deleteYakitKaydi);
 
 module.exports = router;

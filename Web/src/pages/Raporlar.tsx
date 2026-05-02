@@ -66,7 +66,7 @@ export default function RaporlarPage() {
         raporAPI.getAll(),
         sirketAPI.getAll(),
       ]);
-      setRaporlar(raporRes.raporlar || []);
+      setRaporlar(raporRes.data || []);
       setSirketler(sirketRes.sirketler || []);
     } catch (error: any) {
       toast.error('Veriler yüklenirken hata oluştu');
@@ -78,9 +78,20 @@ export default function RaporlarPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!formData.sirket_id) {
+        toast.error('Lütfen bir şirket seçin');
+        return;
+      }
+      if (!formData.rapor_tipi) {
+        toast.error('Lütfen rapor tipi seçin');
+        return;
+      }
+
       const data = {
         ...formData,
         sirket_id: parseInt(formData.sirket_id),
+        baslangic_tarihi: formData.baslangic_tarihi || null,
+        bitis_tarihi: formData.bitis_tarihi || null,
       };
 
       if (editingRapor) {

@@ -100,6 +100,8 @@ exports.createArac = async (req, res) => {
       });
     }
 
+    const cleanVal = (val) => val === '' ? null : val;
+
     const result = await pool.query(
       `INSERT INTO araclar (
         filo_id, sirket_id, plaka, marka, model, yil, renk, arac_tipi,
@@ -110,18 +112,35 @@ exports.createArac = async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
        RETURNING *`,
       [
-        filo_id, sirket_id, plaka, marka, model, yil, renk, arac_tipi,
-        vin_no, motor_no, sarj_no, kapasite_kg, kapasite_m3, yakit_tipi,
-        ortalama_yakit_tuketimi, sigorta_numarasi, sigorta_baslangic_tarihi,
-        sigorta_bitis_tarihi, teknik_muayene_tarihi, son_bakım_tarihi,
-        alis_km || 0, alis_fiyat || 0, alis_tarihi, alis_km || 0
+        filo_id, sirket_id, plaka, marka, model, yil, 
+        cleanVal(renk), cleanVal(arac_tipi), cleanVal(vin_no), cleanVal(motor_no), 
+        cleanVal(sarj_no), cleanVal(kapasite_kg), cleanVal(kapasite_m3), cleanVal(yakit_tipi),
+        cleanVal(ortalama_yakit_tuketimi), cleanVal(sigorta_numarasi), 
+        cleanVal(sigorta_baslangic_tarihi), cleanVal(sigorta_bitis_tarihi), 
+        cleanVal(teknik_muayene_tarihi), cleanVal(son_bakım_tarihi),
+        alis_km || 0, alis_fiyat || 0, cleanVal(alis_tarihi), alis_km || 0
       ]
     );
+
+    const newArac = result.rows[0];
+
+    // Yeni araç için varsayılan bir başlangıç konumu ekle (Haritada hemen görünmesi için)
+    // Varsayılan konum: Beşiktaş, İstanbul (41.0422, 29.0067)
+    try {
+      await pool.query(
+        `INSERT INTO arac_konum_takibi (arac_id, enlem, boylam, hiz, motor_durum)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [newArac.arac_id, 41.0422, 29.0067, 0, false]
+      );
+    } catch (locationError) {
+      console.error('Yeni araç için varsayılan konum ekleme hatası:', locationError);
+      // Konum eklenemese bile araç oluşturulduğu için devam edebiliriz
+    }
 
     return res.status(201).json({
       success: true,
       message: 'Araç başarıyla oluşturuldu',
-      arac: result.rows[0]
+      arac: newArac
     });
   } catch (error) {
     if (error.code === '23505') {
@@ -152,8 +171,9 @@ exports.updateArac = async (req, res) => {
     let paramCount = 1;
 
     Object.keys(updateData).forEach(key => {
+      const val = updateData[key] === '' ? null : updateData[key];
       fields.push(`${key} = $${paramCount}`);
-      params.push(updateData[key]);
+      params.push(val);
       paramCount++;
     });
 

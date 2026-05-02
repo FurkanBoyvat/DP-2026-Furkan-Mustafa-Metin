@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const geo = require('../controllers/geofencingController');
+const { verifyToken } = require('../middleware/authMiddleware');
+
+// Tüm rotalar için token doğrulaması zorunlu
+router.use(verifyToken);
 
 // Bölge yönetimi
 router.post('/region/save', geo.saveAllowedRegion);       // POST: GeoJSON şehir poligonu kaydet

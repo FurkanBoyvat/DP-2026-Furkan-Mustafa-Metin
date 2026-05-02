@@ -3,16 +3,12 @@ const pool = require('../config/database');
 // Tüm bakım taleplerini listele
 const getAllBakimTalepleri = async (req, res) => {
   try {
-    console.log('getAllBakimTalepleri - Starting query...');
-    
     const result = await pool.query(
       `SELECT bt.*, a.plaka, a.marka, a.model
        FROM bakim_talepleri bt
        LEFT JOIN araclar a ON bt.arac_id = a.arac_id
        ORDER BY bt.talek_tarihi DESC`
     );
-    
-    console.log('getAllBakimTalepleri - Query success, rows:', result.rows.length);
     
     res.status(200).json({
       success: true,
@@ -68,8 +64,6 @@ const getBakimTalebiById = async (req, res) => {
 const createBakimTalebi = async (req, res) => {
   try {
     const { arac_id, bakim_tipi, aciklama, durum } = req.body;
-    
-    console.log('createBakimTalebi - Request body:', req.body);
     
     if (!arac_id) {
       return res.status(400).json({

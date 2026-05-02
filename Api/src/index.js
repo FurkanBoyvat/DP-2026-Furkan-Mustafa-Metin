@@ -13,37 +13,65 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 
-// Request Logger Middleware
+// ── Akıllı Logger Middleware ──────────────────────────────────────────────────
+// Polling endpointlerinin başarılı (2xx) GET loglarını bastırır.
+// Sadece şunları loglar: hatalar (4xx/5xx), mutasyonlar (POST/PUT/DELETE), özel eventler
+
+// Polling loglama bastırma listesi
+const SILENT_POLLING_PATTERNS = [
+  /^\/api\/takip\/konum\/\d+$/,          // GET /api/takip/konum/:id
+  /^\/api\/takip\/konumlar\/all/,         // GET /api/takip/konumlar/all
+  /^\/api\/bolge-ihlalleri(\?.*)?$/,      // GET /api/bolge-ihlalleri
+  /^\/api\/kisitli-alanlar\/aktif\/all/,  // GET /api/kisitli-alanlar/aktif/all
+  /^\/api\/araclar(\?.*)?$/,              // GET /api/araclar
+  /^\/api\/yakit\/sofor\/leaderboard/,    // GET /api/yakit/sofor/leaderboard*
+  /^\/api\/yakit\/sofor\/kayitlar/,       // GET /api/yakit/sofor/kayitlar
+  /^\/api\/kullanicilar\/soforler\/all/,  // GET /api/kullanicilar/soforler/all
+  /^\/api\/bakim(\?.*)?$/,               // GET /api/bakim
+];
+
+const isSilentPolling = (method, url) => {
+  if (method !== 'GET') return false;
+  return SILENT_POLLING_PATTERNS.some(pattern => pattern.test(url));
+};
+
 app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
+  const startTime = Date.now();
   const method = req.method;
   const url = req.url;
   const ip = req.ip || req.connection.remoteAddress;
-  const userAgent = req.get('User-Agent');
-  
-  console.log(`[${timestamp}] ${method} ${url} - IP: ${ip}`);
-  console.log(`  User-Agent: ${userAgent}`);
-  
-  if (req.body && Object.keys(req.body).length > 0) {
-    console.log(`  Body:`, JSON.stringify(req.body, null, 2));
+  const silent = isSilentPolling(method, url);
+
+  // Polling olmayan veya mutasyon isteklerini logla
+  if (!silent) {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${method} ${url} - IP: ${ip}`);
+    if (req.body && Object.keys(req.body).length > 0) {
+      const bodyStr = JSON.stringify(req.body);
+      console.log(`  Body: ${bodyStr.substring(0, 300)}`);
+    }
   }
-  
-  // Response logger
+
+  // Response hook: her zaman hataları logla, başarılı pollingleri loglamayacak
   const originalSend = res.send;
   res.send = function(data) {
-    const timestamp = new Date().toISOString();
     const statusCode = res.statusCode;
-    console.log(`[${timestamp}] Response ${statusCode} for ${method} ${url}`);
-    if (data && typeof data === 'object') {
-      console.log(`  Response:`, JSON.stringify(data, null, 2));
-    } else if (data) {
-      console.log(`  Response:`, data.toString().substring(0, 200));
+    const duration = Date.now() - startTime;
+    const isError = statusCode >= 400;
+
+    if (isError || !silent) {
+      const timestamp = new Date().toISOString();
+      const icon = statusCode >= 500 ? '❌' : statusCode >= 400 ? '⚠️ ' : '✅';
+      console.log(`${icon} [${timestamp}] ${statusCode} ${method} ${url} (${duration}ms)`);
+      if (isError && data) {
+        const str = typeof data === 'string' ? data : JSON.stringify(data);
+        console.log(`   ${str.substring(0, 300)}`);
+      }
     }
-    console.log('=== END ===');
+
     return originalSend.call(this, data);
   };
-  
-  console.log('---');
+
   next();
 });
 
@@ -153,7 +181,7 @@ const startServer = async () => {
     // Admin kullanıcı oluştur
     await createAdminUser();
 
-    app.listen(PORT, '0.0.0.0', () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('\n=====================================');
     console.log('🚀 ARAÇ TAKIP SİSTEMİ API');
     console.log('=====================================');
@@ -292,6 +320,18 @@ const startServer = async () => {
     console.log('   GET    /api/health');
     console.log('=====================================');
     console.log('');
+    });
+
+    // EADDRINUSE: Port dolu — temiz hata mesajı
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`\n❌ Port ${PORT} zaten kullanımda!`);
+        console.error(`   Çözüm: node start.js kullanın (otomatik temizler)`);
+        console.error(`   veya: taskkill /F /IM node.exe komutu çalıştırın\n`);
+        process.exit(1);
+      } else {
+        throw err;
+      }
     });
   } catch (error) {
     console.error('❌ Sunucu başlatma hatası:', error);

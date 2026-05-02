@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const kisitliAlanController = require('../controllers/kisitliAlanController');
+const { verifyToken, verifySirketYoneticisi } = require('../middleware/authMiddleware');
+
+// Tüm rotalar için token doğrulaması zorunlu
+router.use(verifyToken);
 
 // Tüm kısıtlı alanları listele
 router.get('/', kisitliAlanController.getAllKisitliAlanlar);
@@ -17,22 +21,24 @@ router.get('/geocode/search', kisitliAlanController.searchAddress);
 // Adres arama - birden fazla sonuç (/:alan_id'dan ÖNCE tanımlanmalı!)
 router.get('/geocode/search-multiple', kisitliAlanController.searchAddressMultiple);
 
-// Adres ile kısıtlı alan oluştur (/:alan_id'dan ÖNCE tanımlanmalı!)
-router.post('/from-address', kisitliAlanController.createKisitliAlanFromAddress);
+// --- Yetki Gerektiren İşlemler ---
 
-// Adres ile kısıtlı alan oluştur - Sınır/Boundary ile (Profesyonel) (/:alan_id'dan ÖNCE!)
-router.post('/from-address/boundary', kisitliAlanController.createKisitliAlanFromAddressWithBoundary);
+// Adres ile kısıtlı alan oluştur
+router.post('/from-address', verifySirketYoneticisi, kisitliAlanController.createKisitliAlanFromAddress);
+
+// Adres ile kısıtlı alan oluştur - Sınır/Boundary ile (Profesyonel)
+router.post('/from-address/boundary', verifySirketYoneticisi, kisitliAlanController.createKisitliAlanFromAddressWithBoundary);
 
 // Tek kısıtlı alan getir
 router.get('/:alan_id', kisitliAlanController.getKisitliAlanById);
 
 // Kısıtlı alan oluştur (manuel koordinat ile)
-router.post('/', kisitliAlanController.createKisitliAlan);
+router.post('/', verifySirketYoneticisi, kisitliAlanController.createKisitliAlan);
 
 // Kısıtlı alan güncelle
-router.put('/:alan_id', kisitliAlanController.updateKisitliAlan);
+router.put('/:alan_id', verifySirketYoneticisi, kisitliAlanController.updateKisitliAlan);
 
 // Kısıtlı alan sil
-router.delete('/:alan_id', kisitliAlanController.deleteKisitliAlan);
+router.delete('/:alan_id', verifySirketYoneticisi, kisitliAlanController.deleteKisitliAlan);
 
 module.exports = router;

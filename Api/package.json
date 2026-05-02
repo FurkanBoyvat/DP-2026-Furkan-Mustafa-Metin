@@ -4,8 +4,9 @@
   "description": "Araç Takip ve Yönetim Sistemi API",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "start": "node start.js",
+    "dev": "node start.js",
+    "direct": "node src/index.js",
     "test": "jest"
   },
   "keywords": [
@@ -25,6 +26,7 @@
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.0",
     "moment": "^2.29.4",
+    "nodemailer": "^8.0.7",
     "pg": "^8.10.0"
   },
   "devDependencies": {

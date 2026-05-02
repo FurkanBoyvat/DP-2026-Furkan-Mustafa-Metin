@@ -77,12 +77,30 @@ const createKisitliAlan = async (req, res) => {
       koordinatlar = null
     } = req.body;
     
+    if (!sirket_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Şirket seçimi zorunludur'
+      });
+    }
+
     const result = await pool.query(
       `INSERT INTO kisitli_alanlar 
        (alan_adi, aciklama, merkez_enlem, merkez_boylam, yaricap_metre, max_hiz_kmh, alan_tipi, sirket_id, geometri_tipi, koordinatlar)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [alan_adi, aciklama, merkez_enlem || null, merkez_boylam || null, yaricap_metre || null, max_hiz_kmh, alan_tipi, sirket_id, geometri_tipi, koordinatlar ? JSON.stringify(koordinatlar) : null]
+      [
+        alan_adi, 
+        aciklama, 
+        merkez_enlem || null, 
+        merkez_boylam || null, 
+        yaricap_metre || null, 
+        max_hiz_kmh || null, 
+        alan_tipi, 
+        sirket_id, 
+        geometri_tipi, 
+        koordinatlar ? JSON.stringify(koordinatlar) : null
+      ]
     );
     
     res.status(201).json({
@@ -322,9 +340,16 @@ const updateKisitliAlan = async (req, res) => {
        WHERE alan_id = $11
        RETURNING *`,
       [
-        alan_adi, aciklama, merkez_enlem || null, merkez_boylam || null, 
-        yaricap_metre || null, max_hiz_kmh, alan_tipi, durum, 
-        geometri_tipi || 'daire', koordinatlar ? JSON.stringify(koordinatlar) : null,
+        alan_adi, 
+        aciklama, 
+        merkez_enlem || null, 
+        merkez_boylam || null, 
+        yaricap_metre || null, 
+        max_hiz_kmh || null, 
+        alan_tipi, 
+        durum, 
+        geometri_tipi || 'daire', 
+        koordinatlar ? JSON.stringify(koordinatlar) : null,
         alan_id
       ]
     );

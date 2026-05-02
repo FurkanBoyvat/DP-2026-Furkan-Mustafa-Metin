@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const raporController = require('../controllers/raporController');
+const { verifyToken } = require('../middleware/authMiddleware');
+
+// Tüm rotalar için token doğrulaması zorunlu
+router.use(verifyToken);
 
 // Tüm raporları listele
 router.get('/', raporController.getAllRaporlar);

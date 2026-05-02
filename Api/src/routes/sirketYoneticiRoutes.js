@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const sirketYoneticiController = require('../controllers/sirketYoneticiController');
+const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
+
+// Tüm rotalar için token doğrulaması zorunlu
+router.use(verifyToken);
 
 // Tüm şirket yöneticilerini listele
 router.get('/', sirketYoneticiController.getAllSirketYoneticileri);
@@ -17,13 +21,15 @@ router.get('/kullanici/:kullanici_id', sirketYoneticiController.getSirketYonetic
 // Tek şirket yöneticisi getir
 router.get('/:yonetici_id', sirketYoneticiController.getSirketYoneticisiById);
 
+// --- Sadece Admin Yetkisi Gerektiren İşlemler ---
+
 // Şirket yöneticisi ataması oluştur
-router.post('/', sirketYoneticiController.createSirketYoneticisi);
+router.post('/', verifyAdmin, sirketYoneticiController.createSirketYoneticisi);
 
 // Şirket yöneticisi güncelle
-router.put('/:yonetici_id', sirketYoneticiController.updateSirketYoneticisi);
+router.put('/:yonetici_id', verifyAdmin, sirketYoneticiController.updateSirketYoneticisi);
 
 // Şirket yöneticisi atamasını sil
-router.delete('/:yonetici_id', sirketYoneticiController.deleteSirketYoneticisi);
+router.delete('/:yonetici_id', verifyAdmin, sirketYoneticiController.deleteSirketYoneticisi);
 
 module.exports = router;

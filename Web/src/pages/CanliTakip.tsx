@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+import { useSearchParams } from 'react-router-dom';
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -37,6 +39,9 @@ const StatusBadge = ({ hiz, lastUpdated }: { hiz: number; lastUpdated?: number }
 };
 
 export default function CanliTakip() {
+  const [searchParams] = useSearchParams();
+  const initialAracId = searchParams.get('id');
+  
   const [araclar, setAraclar] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -51,6 +56,13 @@ export default function CanliTakip() {
   const { positions, loading: pollingLoading, errors } = useMultiVehicleTracker(selectedIds);
 
   useEffect(() => {
+    // URL'den gelen araç ID'sini otomatik seç
+    if (initialAracId) {
+      const id = parseInt(initialAracId);
+      if (!isNaN(id)) {
+        setSelectedIds([id]);
+      }
+    }
     aracAPI.getAll().then(res => {
       setAraclar(res.data || res.araclar || []);
       setLoading(false);
@@ -119,23 +131,25 @@ export default function CanliTakip() {
         setMyPos({ lat: latitude, lng: longitude, speed: speed || 0 });
 
         try {
-           // Backend'e gönder (Örn: ID 1'i güncelliyoruz)
-           await fetch('http://localhost:3000/api/takip/konum/update', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({
-               arac_id: 1, 
-               enlem: latitude,
-               boylam: longitude,
-               hiz: (speed || 0) * 3.6, 
-               motor_durum: true
-             })
-           });
-           
-           // Eğer seçili değilse tracking modunda otomatik seç
-           if (!selectedIds.includes(1)) {
-              setSelectedIds(prev => [...prev, 1]);
-           }
+            // Eğer seçili araç varsa, yayını o araç için yap
+            const targetId = selectedIds.length > 0 ? selectedIds[0] : 1;
+            
+            await fetch('http://localhost:3000/api/takip/konum/update', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                arac_id: targetId, 
+                enlem: latitude,
+                boylam: longitude,
+                hiz: (speed || 0) * 3.6, 
+                motor_durum: true
+              })
+            });
+            
+            // Eğer seçili değilse tracking modunda otomatik seç
+            if (!selectedIds.includes(targetId)) {
+               setSelectedIds(prev => [...prev, targetId]);
+            }
         } catch (e) {
            console.error('GPS update failed');
         }

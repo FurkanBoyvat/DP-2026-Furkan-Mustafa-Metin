@@ -58,7 +58,7 @@ const menuGroups: MenuGroup[] = [
       { id: 'yakit', label: 'Yakıt Takibi', icon: Fuel, path: '/yakit', color: 'bg-[#f59e0b]', glow: 'rgba(245,158,11,0.3)' },
       { id: 'bakim', label: 'Bakım Yönetimi', icon: Wrench, path: '/bakim', color: 'bg-[#ef4444]', glow: 'rgba(239,68,68,0.3)' },
       { id: 'kisitli-alanlar', label: 'Kısıtlı Alanlar', icon: MapPin, path: '/kisitli-alanlar', color: 'bg-[#8b5cf6]', glow: 'rgba(139,92,246,0.3)' },
-      { id: 'bolge-ihlalleri', label: 'Bölge İhlalleri', icon: ShieldAlert, path: '/bolge-ihlalleri', badge: 3, color: 'bg-[#ef4444]', glow: 'rgba(239,68,68,0.3)' },
+      { id: 'bolge-ihlalleri', label: 'Bölge İhlalleri', icon: ShieldAlert, path: '/bolge-ihlalleri', color: 'bg-[#ef4444]', glow: 'rgba(239,68,68,0.3)' },
     ]
   },
   {
@@ -75,6 +75,30 @@ export function Sidebar() {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [unresolvedViolations, setUnresolvedViolations] = useState(0);
+
+  React.useEffect(() => {
+    // Gerçek çözülmemiş ihlal sayısını getir
+    fetch('http://localhost:3000/api/bolge-ihlalleri')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.bolge_ihlalleri) {
+          const count = data.bolge_ihlalleri.filter((i: any) => !i.onay_durum).length;
+          setUnresolvedViolations(count);
+        }
+      })
+      .catch(err => console.error('Bildirim çekilemedi:', err));
+  }, [location.pathname]); // Sayfa değiştikçe güncelle
+
+  const dynamicMenuGroups = menuGroups.map(group => ({
+    ...group,
+    items: group.items.map(item => {
+      if (item.id === 'bolge-ihlalleri' && unresolvedViolations > 0) {
+        return { ...item, badge: unresolvedViolations };
+      }
+      return item;
+    })
+  }));
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -162,7 +186,7 @@ export function Sidebar() {
           }
         `}</style>
         
-        {menuGroups.map((group, groupIndex) => (
+        {dynamicMenuGroups.map((group, groupIndex) => (
           <div key={group.title} className={cn("mb-6", groupIndex !== 0 && "mt-6")}>
             <div className={cn(
               "px-2 mb-3 transition-opacity duration-300",

@@ -97,6 +97,18 @@ export default function KisitliAlanlarPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!formData.sirket_id) {
+        toast.error('Lütfen bir şirket seçin');
+        return;
+      }
+      if (!formData.alan_tipi) {
+        toast.error('Lütfen bir alan tipi seçin');
+        return;
+      }
+      if (inputMode === 'coordinates' && (!formData.merkez_enlem || !formData.merkez_boylam)) {
+        toast.error('Lütfen koordinatları girin');
+        return;
+      }
       // Adres modunda ve yeni kayıt ise adres API'sini kullan
       if (inputMode === 'address' && !editingAlan && addressInput.trim()) {
         // Hassas sınır (poligon) kullanımı

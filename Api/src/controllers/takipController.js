@@ -2,7 +2,7 @@ const pool = require('../config/database');
 
 // ============== KONUM TAKIBI ==============
 
-// Araç konumunu güncelle (Gerçek zamanlı)
+// Araç konumunu güncelle (Gerçek zamanlı) ve İhlal Kontrolü Yap
 exports.updateAracKonum = async (req, res) => {
   try {
     const { arac_id, enlem, boylam, hiz, irtifa, uydu_sayisi, gps_dogruluk, motor_durum } = req.body;
@@ -15,7 +15,7 @@ exports.updateAracKonum = async (req, res) => {
       });
     }
 
-    // Güncel konum varsa sil, yeni konum ekle
+    // 1. Güncel konumu kaydet
     await pool.query(
       'DELETE FROM arac_konum_takibi WHERE arac_id = $1',
       [arac_id]
@@ -28,13 +28,72 @@ exports.updateAracKonum = async (req, res) => {
       [arac_id, enlem, boylam, hiz || 0, irtifa, uydu_sayisi, gps_dogruluk, motor_durum]
     );
 
+    // 2. İHLAL KONTROLÜ (Geofencing)
+    // Aracın bulunduğu koordinatlara en yakın kısıtlı alanları bul
+    const alanlarResult = await pool.query(
+      `SELECT *, (
+        6371 * acos(
+          cos(radians($1)) * cos(radians(merkez_enlem)) * cos(radians(merkez_boylam) - radians($2)) +
+          sin(radians($1)) * sin(radians(merkez_enlem))
+        ) * 1000
+       ) AS mesafe_metre
+       FROM kisitli_alanlar
+       WHERE durum = true`,
+      [enlem, boylam]
+    );
+
+    const tespitEdilenIhlaller = [];
+
+    for (const alan of alanlarResult.rows) {
+      // Eğer araç alanın içindeyse (mesafe < yarıçap)
+      if (alan.mesafe_metre <= alan.yaricap_metre) {
+        let ihlalTipi = null;
+        let notlar = "";
+
+        // Tip 1: Yasaklı Bölge İhlali
+        if (alan.alan_tipi === 'yasaklı_alan') {
+          ihlalTipi = 'bölgeye_giriş';
+          notlar = `${alan.alan_adi} isimli yasaklı bölgeye giriş yapıldı.`;
+        } 
+        // Tip 2: Hız Aşımı İhlali (Bölge içindeyken)
+        else if (alan.max_hiz_kmh && (hiz || 0) > alan.max_hiz_kmh) {
+          ihlalTipi = 'hız_aşımı';
+          notlar = `${alan.alan_adi} bölgesinde hız sınırı (${alan.max_hiz_kmh} km/h) aşıldı. Tespit edilen hız: ${hiz} km/h`;
+        }
+
+        if (ihlalTipi) {
+          // Bu araç için bu alanda son 5 dakika içinde zaten bir ihlal girilmiş mi kontrol et (Tekrarı önlemek için)
+          const sonIhlal = await pool.query(
+            `SELECT * FROM bolge_ihlal_kayitlari 
+             WHERE arac_id = $1 AND alan_id = $2 AND ihlal_tipi = $3 
+             AND giris_tarihi > NOW() - INTERVAL '5 minutes'
+             LIMIT 1`,
+            [arac_id, alan.alan_id, ihlalTipi]
+          );
+
+          if (sonIhlal.rows.length === 0) {
+            // İhlal kaydını oluştur
+            const ihlalKaydi = await pool.query(
+              `INSERT INTO bolge_ihlal_kayitlari (arac_id, alan_id, ihlal_tipi, giris_tarihi, max_hiz, notlar)
+               VALUES ($1, $2, $3, NOW(), $4, $5)
+               RETURNING *`,
+              [arac_id, alan.alan_id, ihlalTipi, hiz || 0, notlar]
+            );
+            tespitEdilenIhlaller.push(ihlalKaydi.rows[0]);
+            console.log(`⚠️ İHLAL TESPİT EDİLDİ: ${notlar}`);
+          }
+        }
+      }
+    }
+
     return res.status(201).json({
       success: true,
-      message: 'Konum başarıyla güncellendi',
-      konum: result.rows[0]
+      message: 'Konum güncellendi ve ihlal kontrolü yapıldı',
+      konum: result.rows[0],
+      ihlaller: tespitEdilenIhlaller
     });
   } catch (error) {
-    console.error('Konum Güncelle Hatası:', error);
+    console.error('Konum Güncelle/İhlal Kontrol Hatası:', error);
     return res.status(500).json({
       success: false,
       message: 'Sunucu hatası',
@@ -59,9 +118,10 @@ exports.getAracKonum = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Araç konumu bulunamadı'
+      return res.status(200).json({
+        success: true,
+        konum: null,
+        message: 'Araç için henüz konum verisi yok'
       });
     }
 

@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'sonner';
 import Login from './auth/Login';
 import Register from './auth/Register';
+import ForgotPassword from './auth/ForgotPassword';
+import ResetPassword from './auth/ResetPassword';
 import Profile from './auth/Profile';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -52,6 +54,14 @@ function App() {
           <Route 
             path="/register" 
             element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />} 
+          />
+          <Route 
+            path="/forgot-password" 
+            element={!isAuthenticated ? <ForgotPassword /> : <Navigate to="/" replace />} 
+          />
+          <Route 
+            path="/reset-password" 
+            element={!isAuthenticated ? <ResetPassword /> : <Navigate to="/" replace />} 
           />
           {/* Protected Routes with Layout */}
           <Route element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}>

@@ -33,6 +33,7 @@ interface Notification {
   action?: {
     label: string;
     path: string;
+    aracId?: number;
   };
 }
 
@@ -113,7 +114,8 @@ export default function Bildirimler() {
           priority: 'high',
           action: {
             label: 'Canlı Takip',
-            path: '/canli-takip'
+            path: '/canli-takip',
+            aracId: ihlal.arac_id
           }
         });
       });
@@ -417,7 +419,12 @@ export default function Bildirimler() {
                       <div className="flex items-center gap-2 ml-4">
                         {notification.action && (
                           <button
-                            onClick={() => navigate(notification.action!.path)}
+                            onClick={() => {
+                              const path = notification.action!.aracId 
+                                ? `${notification.action!.path}?id=${notification.action!.aracId}`
+                                : notification.action!.path;
+                              navigate(path);
+                            }}
                             className="px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
                           >
                             {notification.action.label}

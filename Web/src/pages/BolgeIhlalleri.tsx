@@ -222,12 +222,7 @@ export default function BolgeIhlalleriPage() {
           <p className="text-slate-500 mt-1">Coğrafi kısıtlama ihlallerini takip edin ve yönetin</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} className="bg-red-500 hover:bg-red-600">
-              <Plus className="w-4 h-4 mr-2" />
-              Yeni İhlal Kaydı
-            </Button>
-          </DialogTrigger>
+          {/* Yeni İhlal Kaydı butonu otomatik tespit nedeniyle kaldırıldı */}
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>{editingIhlal ? 'İhlal Kaydı Düzenle' : 'Yeni İhlal Kaydı'}</DialogTitle>

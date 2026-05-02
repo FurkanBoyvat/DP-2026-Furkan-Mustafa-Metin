@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const takipController = require('../controllers/takipController');
+const { verifyToken } = require('../middleware/authMiddleware');
+
+// Tüm rotalar için token doğrulaması zorunlu
+router.use(verifyToken);
 
 // ============== KONUM TAKIBI ==============
 

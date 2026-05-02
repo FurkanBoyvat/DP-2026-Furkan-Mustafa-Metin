@@ -108,6 +108,10 @@ CREATE TABLE filolar (
 CREATE INDEX idx_filolar_sirket_id ON filolar(sirket_id);
 CREATE INDEX idx_filolar_durum ON filolar(durum);
 
+-- Kullanıcılar tablosuna filo_id ilişkisini ekle (filolar tablosu oluştuktan sonra)
+ALTER TABLE kullanicilar ADD COLUMN filo_id INTEGER REFERENCES filolar(filo_id) ON DELETE SET NULL;
+CREATE INDEX idx_kullanicilar_filo_id ON kullanicilar(filo_id);
+
 -- ==========================================
 -- 6. ARAÇLAR TABLOSU
 -- ==========================================
@@ -133,6 +137,10 @@ CREATE TABLE araclar (
     sigorta_bitis_tarihi DATE,
     teknik_muayene_tarihi DATE,
     son_bakım_tarihi DATE,
+    alis_km DECIMAL(10, 2),
+    alis_fiyat DECIMAL(12, 2),
+    alis_tarihi DATE,
+    mevcut_km DECIMAL(10, 2) DEFAULT 0,
     durum BOOLEAN DEFAULT true NOT NULL,
     olusturulma_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     guncelleme_tarihi TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -300,7 +308,30 @@ CREATE INDEX idx_yakit_tuketim_kayitlari_arac_id ON yakit_tuketim_kayitlari(arac
 CREATE INDEX idx_yakit_tuketim_kayitlari_ikmal_tarihi ON yakit_tuketim_kayitlari(ikmal_tarihi);
 
 -- ==========================================
--- 14. BAKIM TALEPLERI TABLOSU
+-- 14. ŞOFÖR YAKIT KAYITLARI TABLOSU (Aylık)
+-- ==========================================
+CREATE TABLE sofor_yakit_kayitlari (
+    kayit_id            SERIAL PRIMARY KEY,
+    kullanici_id        INTEGER NOT NULL,
+    ay                  INTEGER NOT NULL CHECK (ay BETWEEN 1 AND 12),
+    yil                 INTEGER NOT NULL,
+    aylik_km            DECIMAL(10, 2) DEFAULT 0,
+    aylik_yakit_tutar   DECIMAL(10, 2) DEFAULT 0,
+    notlar              TEXT,
+    olusturulma_tarihi  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    guncelleme_tarihi   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (kullanici_id) REFERENCES kullanicilar(kullanici_id) ON DELETE CASCADE,
+    UNIQUE (kullanici_id, ay, yil)
+);
+
+CREATE INDEX idx_sofor_yakit_kullanici_id ON sofor_yakit_kayitlari(kullanici_id);
+CREATE INDEX idx_sofor_yakit_yil_ay ON sofor_yakit_kayitlari(yil, ay);
+
+CREATE TRIGGER sofor_yakit_guncelleme BEFORE UPDATE ON sofor_yakit_kayitlari
+FOR EACH ROW EXECUTE FUNCTION guncelleme_tarihi_guncelle();
+
+-- ==========================================
+-- 15. BAKIM TALEPLERI TABLOSU
 -- ==========================================
 CREATE TABLE bakim_talepleri (
     talek_id SERIAL PRIMARY KEY,
@@ -340,6 +371,42 @@ CREATE TABLE raporlar (
 
 CREATE INDEX idx_raporlar_sirket_id ON raporlar(sirket_id);
 CREATE INDEX idx_raporlar_rapor_tarihi ON raporlar(rapor_tarihi);
+
+-- ==========================================
+-- 17. GEOFENCİNG: ALLOWED REGIONS TABLOSU
+-- ==========================================
+CREATE TABLE allowed_regions (
+    region_id    SERIAL PRIMARY KEY,
+    arac_id      INTEGER NOT NULL,
+    region_name  VARCHAR(255) NOT NULL,
+    region_type  VARCHAR(50)  DEFAULT 'city',
+    geojson      JSONB        NOT NULL,
+    created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (arac_id) REFERENCES araclar(arac_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_allowed_regions_arac_id ON allowed_regions(arac_id);
+
+-- ==========================================
+-- 18. GEOFENCİNG: VEHICLE GEOFENCE LOG TABLOSU
+-- ==========================================
+CREATE TABLE vehicle_geofence_log (
+    log_id        SERIAL PRIMARY KEY,
+    arac_id       INTEGER NOT NULL,
+    region_id     INTEGER,
+    enlem         DECIMAL(10, 8) NOT NULL,
+    boylam        DECIMAL(11, 8) NOT NULL,
+    hiz           DECIMAL(5, 2)  DEFAULT 0,
+    is_violation  BOOLEAN        DEFAULT false,
+    violation_msg TEXT,
+    kayit_tarihi  TIMESTAMP      DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (arac_id)   REFERENCES araclar(arac_id) ON DELETE CASCADE,
+    FOREIGN KEY (region_id) REFERENCES allowed_regions(region_id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_geofence_log_arac_id     ON vehicle_geofence_log(arac_id);
+CREATE INDEX idx_geofence_log_tarihi      ON vehicle_geofence_log(kayit_tarihi);
+CREATE INDEX idx_geofence_log_is_violation ON vehicle_geofence_log(is_violation);
 
 -- ==========================================
 -- VIEWS (GÖRÜNTÜLER)

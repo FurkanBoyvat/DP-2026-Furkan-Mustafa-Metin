@@ -2,19 +2,14 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 
-// Giriş
 router.post('/login', authController.login);
-
-// Kayıt
 router.post('/register', authController.register);
-
-// Profil
 router.get('/profile', authController.profil);
-
-// Profil Güncelleme
 router.put('/profile', authController.updateProfile);
-
-// Şifre Değiştirme
 router.put('/change-password', authController.changePassword);
+
+// Şifre Sıfırlama
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
 
 module.exports = router;
